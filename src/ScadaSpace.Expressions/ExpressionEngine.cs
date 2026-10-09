@@ -9,7 +9,7 @@ public sealed class ExpressionException(string message, int position = -1) : For
     public int Position { get; } = position;
 }
 
-/// <summary>A bounded, interpreted expression compiler suitable for AOT and untrusted project files. No eval/reflection/I/O.</summary>
+/// <summary>A bounded interpreted expression compiler. No eval, reflection, file or network access.</summary>
 public sealed class ExpressionEngine(int cacheCapacity = 256)
 {
     private readonly object _gate = new();
@@ -26,18 +26,18 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
             var root = parser.Parse();
             var expression = new CompiledExpression(root, parser.Dependencies.ToArray());
             _cache[source] = expression; _order.Enqueue(source);
-            while (_order.Count > Math.Max(1, cacheCapacity)) _cache.Remove(_order.Dequeue());
+            while (_order.Count > Math.Clamp(cacheCapacity, 1, 4096)) _cache.Remove(_order.Dequeue());
             return expression;
         }
     }
     public Scalar Evaluate(string source, Func<string, Scalar>? resolve = null) => Compile(source).Evaluate(resolve ?? (_ => throw new ExpressionException("Unknown reference.")));
-
     internal abstract record Node
     {
         public Scalar Eval(Context context)
         {
-            if (--context.Budget < 0) throw new ExpressionException("Expression evaluation budget exceeded.");
-            return Evaluate(context);
+            if (--context.Budget < 0 || ++context.Depth > 128) throw new ExpressionException("Expression evaluation budget or stack depth exceeded.");
+            try { return Evaluate(context); }
+            finally { context.Depth--; }
         }
         protected abstract Scalar Evaluate(Context context);
     }
@@ -45,9 +45,17 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
     {
         public Func<string, Scalar> Resolve { get; } = resolve;
         public int Budget = 4096;
+        public int Depth;
     }
     private sealed record Literal(Scalar Value) : Node { protected override Scalar Evaluate(Context c) => Value; }
-    private sealed record Reference(string Path) : Node { protected override Scalar Evaluate(Context c) => c.Resolve(Path); }
+    private sealed record Reference(string Path) : Node
+    {
+        protected override Scalar Evaluate(Context c)
+        {
+            var value = c.Resolve(Path);
+            return value.IsValid() ? value : throw new ExpressionException("Invalid reference value: " + Path);
+        }
+    }
     private sealed record Unary(string Op, Node Operand) : Node
     {
         protected override Scalar Evaluate(Context c) => Op switch
@@ -88,6 +96,17 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
         protected override Scalar Evaluate(Context c) => Condition.Eval(c).AsBoolean() ? Yes.Eval(c) : No.Eval(c);
     }
     private static string Limit(string value) => value.Length <= 65536 ? value : throw new ExpressionException("String result exceeds 64 KiB.");
+    private static string Concat(IEnumerable<Scalar> values)
+    {
+        var text = new StringBuilder();
+        foreach (var value in values)
+        {
+            var part = value.ToString();
+            if (part.Length > 65536 - text.Length) throw new ExpressionException("String result exceeds 64 KiB.");
+            text.Append(part);
+        }
+        return text.ToString();
+    }
     private sealed record Call(string Name, Node[] Args) : Node
     {
         protected override Scalar Evaluate(Context c)
@@ -111,8 +130,8 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
                 "contains" => Scalar.From(S(0).Contains(S(1), StringComparison.Ordinal)), "startswith" => Scalar.From(S(0).StartsWith(S(1), StringComparison.Ordinal)),
                 "endswith" => Scalar.From(S(0).EndsWith(S(1), StringComparison.Ordinal)),
                 "substring" => Scalar.From(a.Length == 2 ? S(0)[checked((int)N(1))..] : S(0).Substring(checked((int)N(1)), checked((int)N(2)))),
-                "concat" => Scalar.From(Limit(string.Concat(a.Select(x => x.ToString())))),
-                "numberformat" => Scalar.From(Limit(N(0).ToString(S(1), CultureInfo.InvariantCulture))),
+                "concat" => Scalar.From(Concat(a)),
+                "numberformat" => Scalar.From(NumberFormatting.Format(N(0), S(1))),
                 _ => throw new ExpressionException("Unknown function.")
             };
         }
@@ -255,6 +274,7 @@ public sealed class CompiledExpression
     internal CompiledExpression(ExpressionEngine.Node root, string[] dependencies) { _root = root; Dependencies = Array.AsReadOnly(dependencies); }
     public Scalar Evaluate(Func<string, Scalar> resolve)
     {
+        ArgumentNullException.ThrowIfNull(resolve);
         try { return _root.Eval(new(resolve)); }
         catch (ExpressionException) { throw; }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or OverflowException or FormatException) { throw new ExpressionException(ex.Message); }

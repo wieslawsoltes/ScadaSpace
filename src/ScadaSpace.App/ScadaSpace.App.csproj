@@ -10,11 +10,14 @@
     <UnoFeatures>SkiaRenderer;</UnoFeatures>
     <IsUiAutomationMappingEnabled>true</IsUiAutomationMappingEnabled>
     <WasmShellWebAppBasePath>/ScadaSpace/</WasmShellWebAppBasePath>
-    <WasmShellILLinkerEnabled>false</WasmShellILLinkerEnabled>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ScadaSpace.Controls/ScadaSpace.Controls.csproj" />
     <ProjectReference Include="../ScadaSpace.Persistence/ScadaSpace.Persistence.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'browserwasm'">
+    <LinkerDescriptor Include="Platforms/WebAssembly/LinkerConfig.xml" />
+    <TrimmerRootDescriptor Include="Platforms/WebAssembly/LinkerConfig.xml" />
   </ItemGroup>
 </Project>

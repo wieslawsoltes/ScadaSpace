@@ -1,0 +1,15 @@
+<linker>
+  <!-- Project files, runtime observations and XAML use these types dynamically. -->
+  <assembly fullname="ScadaSpace.App" preserve="all" />
+  <assembly fullname="ScadaSpace.Core" preserve="all" />
+  <assembly fullname="ScadaSpace.Tags" preserve="all" />
+  <assembly fullname="ScadaSpace.Expressions" preserve="all" />
+  <assembly fullname="ScadaSpace.History" preserve="all" />
+  <assembly fullname="ScadaSpace.Alarms" preserve="all" />
+  <assembly fullname="ScadaSpace.Runtime" preserve="all" />
+  <assembly fullname="ScadaSpace.Designer" preserve="all" />
+  <assembly fullname="ScadaSpace.Layout" preserve="all" />
+  <assembly fullname="ScadaSpace.Persistence" preserve="all" />
+  <assembly fullname="ScadaSpace.Graphics" preserve="all" />
+  <assembly fullname="ScadaSpace.Controls" preserve="all" />
+</linker>

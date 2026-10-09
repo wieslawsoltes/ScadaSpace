@@ -4,10 +4,7 @@ using ScadaSpace.Graphics;
 using SkiaSharp;
 using Uno.WinUI.Graphics2DSK;
 using Windows.Foundation;
-
 namespace ScadaSpace.Controls;
-
-/// <summary>Reusable XAML-bindable vector symbol drawn directly into Uno's Skia composition surface.</summary>
 public partial class HmiSymbol : SKCanvasElement
 {
     private static DependencyProperty Register<T>(string name, T value) => DependencyProperty.Register(name, typeof(T), typeof(HmiSymbol), new PropertyMetadata(value, (o, _) => ((HmiSymbol)o).Invalidate()));
@@ -32,6 +29,7 @@ public partial class HmiSymbol : SKCanvasElement
         var bounds = SKRect.Create((float)area.Width, (float)area.Height);
         try
         {
+            NumberFormatting.Validate(Data.Format);
             SymbolRenderer.Draw(canvas, bounds, Kind, Data with { Value = Value, Minimum = Minimum, Maximum = Maximum, Unit = Unit, Color = SymbolColor, Quality = Quality });
             RenderError = null;
         }

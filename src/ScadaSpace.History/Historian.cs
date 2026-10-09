@@ -39,20 +39,20 @@ public sealed class Historian : IDisposable
         if (capacityPerTag is < 2 or > 1000000) throw new ArgumentOutOfRangeException(nameof(capacityPerTag));
         _capacity = capacityPerTag;
         _definitions = tags.Browse().Where(x => x.HistoryEnabled).ToDictionary(x => x.Path, StringComparer.Ordinal);
-        foreach (var path in _definitions.Keys) Append(path, tags.Read(path));
+        // Subscribe before seeding so changes cannot disappear between a snapshot and subscription.
         _subscription = tags.Subscribe(change => Append(change.Path, change.Current));
+        foreach (var path in _definitions.Keys) Append(path, tags.Read(path));
     }
     public bool Append(string path, QualifiedValue value)
     {
         lock (_gate)
         {
-            if (!_definitions.TryGetValue(path, out var definition)) return false;
+            if (!_definitions.TryGetValue(path, out var definition) || !value.Value.IsValid() || !Enum.IsDefined(value.Quality)) return false;
             if (!_series.TryGetValue(path, out var ring)) _series[path] = ring = new(_capacity);
             if (ring.Last is { } last)
             {
-                // UTC timestamps can repeat, but out-of-order insertion is rejected rather than corrupting charts.
                 if (value.Timestamp < last.Timestamp || (value.Timestamp == last.Timestamp && value.Revision <= last.Revision)) return false;
-                if (definition.HistoryDeadband > 0 && last.Quality == value.Quality && value.Value.Kind == ScalarKind.Number && Math.Abs(last.Value.AsNumber() - value.Value.Number) < definition.HistoryDeadband) return false;
+                if (definition.HistoryDeadband > 0 && last.Quality == value.Quality && value.Value.Kind == ScalarKind.Number && last.Value.Kind == ScalarKind.Number && Math.Abs(last.Value.Number - value.Value.Number) < definition.HistoryDeadband) return false;
             }
             ring.Add(value);
             return true;
@@ -68,7 +68,7 @@ public sealed class Historian : IDisposable
     }
     public HistoryBucket[] Aggregate(string path, DateTimeOffset start, DateTimeOffset end, int bucketCount, AggregateKind kind)
     {
-        if (bucketCount is < 1 or > 10000 || end <= start) throw new ArgumentException("Invalid aggregation interval.");
+        if (bucketCount is < 1 or > 10000 || end <= start || !Enum.IsDefined(kind)) throw new ArgumentException("Invalid aggregation interval or kind.");
         var points = Query(path, start, end);
         var ticks = (end - start).Ticks;
         var groups = Enumerable.Range(0, bucketCount).Select(_ => new List<QualifiedValue>()).ToArray();
@@ -90,28 +90,37 @@ public sealed class Historian : IDisposable
                 AggregateKind.Maximum when numbers.Length > 0 => Scalar.From(numbers.Max()),
                 _ => Scalar.Null
             };
-            return new HistoryBucket(start.AddTicks((long)(ticks * (index / (double)bucketCount))), start.AddTicks((long)(ticks * ((index + 1) / (double)bucketCount))), value, value.Kind == ScalarKind.Null ? Quality.BadNotFound : good.Length == group.Count ? Quality.Good : Quality.Uncertain, good.Length);
+            var quality = value.Kind == ScalarKind.Null ? Quality.BadNotFound : good.Length == group.Count ? Quality.Good : Quality.Uncertain;
+            return new HistoryBucket(start.AddTicks((long)(ticks * (index / (double)bucketCount))), start.AddTicks((long)(ticks * ((index + 1) / (double)bucketCount))), value, quality, good.Length);
         }).ToArray();
     }
-    /// <summary>Preserves per-pixel min/max excursions instead of averaging away short alarm spikes.</summary>
+    /// <summary>
+    /// Time-bucketed extrema preserve spikes, endpoints and every quality transition.
+    /// Quality transitions may exceed the normal 2*pixels+2 budget: drawing an outage as a continuous good line is not permitted.
+    /// Input samples must be ordered by timestamp and revision, as returned by Query.
+    /// </summary>
     public static QualifiedValue[] Decimate(IReadOnlyList<QualifiedValue> points, int pixels)
     {
-        if (pixels < 1) throw new ArgumentOutOfRangeException(nameof(pixels));
+        if (pixels is < 1 or > 1000000) throw new ArgumentOutOfRangeException(nameof(pixels));
         if (points.Count <= pixels * 2) return points.ToArray();
-        var result = new List<QualifiedValue>(pixels * 2 + 2) { points[0] };
-        for (var i = 0; i < pixels; i++)
+        var selected = new SortedSet<int> { 0, points.Count - 1 };
+        var minima = Enumerable.Repeat(-1, pixels).ToArray();
+        var maxima = Enumerable.Repeat(-1, pixels).ToArray();
+        var first = points[0].Timestamp;
+        var duration = (points[^1].Timestamp - first).Ticks;
+        bool Numeric(QualifiedValue sample) => sample.IsGood && sample.Value.Kind == ScalarKind.Number;
+        for (var i = 0; i < points.Count; i++)
         {
-            var from = i * points.Count / pixels;
-            var to = (i + 1) * points.Count / pixels;
-            var slice = points.Skip(from).Take(to - from).ToArray();
-            if (slice.Any(p => !p.IsGood || p.Value.Kind != ScalarKind.Number)) { result.Add(slice[0]); continue; }
-            var min = slice.MinBy(x => x.Value.Number);
-            var max = slice.MaxBy(x => x.Value.Number);
-            if (min.Timestamp <= max.Timestamp) { result.Add(min); result.Add(max); }
-            else { result.Add(max); result.Add(min); }
+            var point = points[i];
+            if (i > 0 && (point.Quality != points[i - 1].Quality || Numeric(point) != Numeric(points[i - 1])))
+            { selected.Add(i - 1); selected.Add(i); }
+            if (!Numeric(point)) continue;
+            var bucket = duration > 0 ? Math.Clamp((int)((point.Timestamp - first).Ticks / (double)duration * pixels), 0, pixels - 1) : Math.Min(pixels - 1, (int)(i / (double)points.Count * pixels));
+            if (minima[bucket] < 0 || point.Value.Number < points[minima[bucket]].Value.Number) minima[bucket] = i;
+            if (maxima[bucket] < 0 || point.Value.Number > points[maxima[bucket]].Value.Number) maxima[bucket] = i;
         }
-        result.Add(points[^1]);
-        return result.Distinct().OrderBy(x => x.Timestamp).ThenBy(x => x.Revision).ToArray();
+        foreach (var index in minima.Concat(maxima)) if (index >= 0) selected.Add(index);
+        return selected.Select(index => points[index]).ToArray();
     }
     public string ExportCsv(string path, DateTimeOffset? start = null, DateTimeOffset? end = null)
     {

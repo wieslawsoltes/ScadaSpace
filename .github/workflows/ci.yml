@@ -25,7 +25,15 @@ jobs:
           dotnet build src/ScadaSpace.Layout -c Release
           dotnet build src/ScadaSpace.Graphics -c Release
       - name: Run deterministic engine regressions
-        run: dotnet run --project tests/ScadaSpace.Tests -c Release
+        run: |
+          dotnet run --project tests/ScadaSpace.Tests -c Release
+          dotnet run --project tests/ScadaSpace.Hardening.Tests -c Release
+      - name: Pack reusable engine libraries
+        run: |
+          for project in src/*/*.csproj; do
+            case "$project" in *ScadaSpace.App/*|*ScadaSpace.Controls/*) continue;; esac
+            dotnet pack "$project" -c Release --no-build -o artifacts/packages
+          done
       - name: Archive exact source tree
         if: always()
         run: |
@@ -38,6 +46,10 @@ jobs:
           path: |
             TestResults
             artifacts/ScadaSpace-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-engines
+          path: artifacts/packages
   browser:
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +60,8 @@ jobs:
       - run: dotnet workload install wasm-tools
       - name: Publish Uno WebAssembly application
         run: dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
+      - name: Pack reusable Uno controls
+        run: dotnet pack src/ScadaSpace.Controls -c Release -o artifacts/uno-packages
       - name: Install pinned browser test tooling
         run: |
           python -m pip install playwright==1.57.0
@@ -70,6 +84,19 @@ jobs:
         with:
           name: browser-app
           path: artifacts/browser
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-controls
+          path: artifacts/uno-packages
+      - name: Prepare Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          touch artifacts/browser/wwwroot/.nojekyll
+          cp artifacts/browser/wwwroot/index.html artifacts/browser/wwwroot/404.html
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: artifacts/browser/wwwroot
   desktop:
     runs-on: ubuntu-latest
     steps:
@@ -79,3 +106,18 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Build desktop application
         run: dotnet build src/ScadaSpace.App -f net10.0-desktop -c Release
+  pages:
+    needs: [core, browser, desktop]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy validated browser application
+        id: deployment
+        uses: actions/deploy-pages@v4
