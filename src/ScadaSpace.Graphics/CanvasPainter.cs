@@ -5,9 +5,11 @@ namespace ScadaSpace.Graphics;
 /// <summary>Frame-local paints are reused across primitives and deterministically disposed.</summary>
 public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
 {
+    /// <summary>Optional application-owned typeface. Set before drawing and retain it until rendering has stopped.</summary>
+    public static SKTypeface? DrawingTypeface { get; set; }
     public SKCanvas Canvas { get; } = canvas;
     private readonly SKPaint _paint = new() { IsAntialias = true, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
-    private readonly SKFont _font = new(SKTypeface.Default, 13);
+    private readonly SKFont _font = new(DrawingTypeface ?? SKTypeface.Default, 13);
     public static SKColor Color(string value, string fallback = "#415969") => SKColor.TryParse(value, out var color) ? color : SKColor.Parse(fallback);
     private SKPaint Paint(SKColor color, bool stroke = false, float width = 1)
     {
