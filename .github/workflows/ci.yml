@@ -17,8 +17,35 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Build reusable engines
+      - name: Build reusable engines and renderer
         run: |
           dotnet build src/ScadaSpace.Runtime -c Release
           dotnet build src/ScadaSpace.Designer -c Release
           dotnet build src/ScadaSpace.Persistence -c Release
+          dotnet build src/ScadaSpace.Layout -c Release
+          dotnet build src/ScadaSpace.Graphics -c Release
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet workload install wasm-tools
+      - name: Publish Uno WebAssembly application
+        run: dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
+      - name: Show publish layout
+        run: find artifacts/browser -maxdepth 3 -type f | head -100
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-app
+          path: artifacts/browser
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build desktop application
+        run: dotnet build src/ScadaSpace.App -f net10.0-desktop -c Release

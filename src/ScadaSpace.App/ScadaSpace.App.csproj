@@ -1,0 +1,20 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <ApplicationTitle>ScadaSpace Designer</ApplicationTitle>
+    <ApplicationId>com.scadaspace.designer</ApplicationId>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <UnoFeatures>SkiaRenderer;</UnoFeatures>
+    <IsUiAutomationMappingEnabled>true</IsUiAutomationMappingEnabled>
+    <WasmShellWebAppBasePath>/ScadaSpace/</WasmShellWebAppBasePath>
+    <WasmShellILLinkerEnabled>false</WasmShellILLinkerEnabled>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ScadaSpace.Controls/ScadaSpace.Controls.csproj" />
+    <ProjectReference Include="../ScadaSpace.Persistence/ScadaSpace.Persistence.csproj" />
+  </ItemGroup>
+</Project>
