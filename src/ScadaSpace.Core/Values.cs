@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ScadaSpace.Core;
@@ -7,6 +8,7 @@ public enum ScalarKind { Null, Number, Boolean, String }
 public enum Quality { Good, Uncertain, Stale, BadNotFound, BadType, BadExpression, BadDisabled }
 
 /// <summary>A closed, immutable value type. It never carries executable code or mutable JSON objects.</summary>
+[JsonConverter(typeof(ScalarJsonConverter))]
 public readonly record struct Scalar(ScalarKind Kind, double Number = 0, bool Boolean = false, string? Text = null)
 {
     public static Scalar Null => default;
@@ -40,9 +42,57 @@ public readonly record struct Scalar(ScalarKind Kind, double Number = 0, bool Bo
         ScalarKind.Number => From(double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture)),
         ScalarKind.Boolean => From(bool.Parse(text)),
         ScalarKind.String => From(text),
-        _ => Null
+        ScalarKind.Null => Null,
+        _ => throw new FormatException("Unknown scalar type.")
     };
     public bool IsValid() => Enum.IsDefined(Kind) && (Kind != ScalarKind.Number || double.IsFinite(Number)) && (Text?.Length ?? 0) <= 65536;
+}
+
+/// <summary>Explicit, reflection-free tagged-value wire format, shared by desktop and WebAssembly.</summary>
+public sealed class ScalarJsonConverter : JsonConverter<Scalar>
+{
+    public override Scalar Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        using var document = JsonDocument.ParseValue(ref reader);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new JsonException("A scalar must be a tagged object.");
+        var fields = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in root.EnumerateObject())
+            if (!fields.TryAdd(property.Name, property.Value)) throw new JsonException("Duplicate scalar property: " + property.Name);
+        if (!fields.TryGetValue("kind", out var token)) throw new JsonException("A scalar kind is required.");
+        ScalarKind kind;
+        if (token.ValueKind == JsonValueKind.String)
+        {
+            if (!Enum.TryParse(token.GetString(), true, out kind) || !Enum.IsDefined(kind)) throw new JsonException("Unknown scalar kind.");
+        }
+        else if (token.ValueKind == JsonValueKind.Number && token.TryGetInt32(out var number) && Enum.IsDefined((ScalarKind)number)) kind = (ScalarKind)number;
+        else throw new JsonException("Invalid scalar kind.");
+        try
+        {
+            var result = kind switch
+            {
+                ScalarKind.Null => Scalar.Null,
+                ScalarKind.Number when fields.TryGetValue("number", out var n) => Scalar.From(n.GetDouble()),
+                ScalarKind.Boolean when fields.TryGetValue("boolean", out var b) => Scalar.From(b.GetBoolean()),
+                ScalarKind.String when fields.TryGetValue("text", out var s) && s.ValueKind == JsonValueKind.String => Scalar.From(s.GetString()),
+                _ => throw new JsonException("The scalar payload does not match its kind.")
+            };
+            if (!result.IsValid()) throw new JsonException("Invalid scalar payload.");
+            return result;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or FormatException)
+        { throw new JsonException("Invalid scalar payload: " + ex.Message, ex); }
+    }
+    public override void Write(Utf8JsonWriter writer, Scalar value, JsonSerializerOptions options)
+    {
+        if (!value.IsValid()) throw new JsonException("Cannot serialize an invalid scalar.");
+        writer.WriteStartObject();
+        writer.WriteString("kind", value.Kind.ToString());
+        writer.WriteNumber("number", value.Number);
+        writer.WriteBoolean("boolean", value.Boolean);
+        if (value.Text is null) writer.WriteNull("text"); else writer.WriteString("text", value.Text);
+        writer.WriteEndObject();
+    }
 }
 
 public readonly record struct QualifiedValue(Scalar Value, Quality Quality, DateTimeOffset Timestamp, long Revision = 0)

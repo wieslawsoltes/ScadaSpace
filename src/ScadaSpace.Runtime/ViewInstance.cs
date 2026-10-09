@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using ScadaSpace.Core;
 using ScadaSpace.Expressions;
@@ -41,29 +40,32 @@ public sealed class ViewInstance
         if (_values.TryGetValue(key, out var cached)) return cached;
         if (_resolving.Count >= 64 || !_resolving.Add(key)) throw new ExpressionException("Cyclic or excessively deep property dependency: " + key);
         var now = DateTimeOffset.UtcNow;
+        var quality = Quality.Good;
+        var timestamp = now;
+        long revision = 0;
+        var hasReference = false;
         try
         {
-            if (!node.Bindings.TryGetValue(property, out var binding)) return _values[key] = QualifiedValue.Good(node.Get(property), now);
+            if (!node.Bindings.TryGetValue(property, out var binding))
+                return _values[key] = node.Props.TryGetValue(property, out var literal) ? QualifiedValue.Good(literal, now) : QualifiedValue.Bad(Quality.BadNotFound, now);
             if (!binding.Enabled) return _values[key] = QualifiedValue.Bad(Quality.BadDisabled, now);
-            var quality = Quality.Good;
-            var stamp = now;
-            long revision = 0;
             Scalar Resolve(string reference)
             {
                 var value = ResolveReference(reference, node);
                 if (value.Quality > quality) quality = value.Quality;
-                stamp = value.Timestamp; revision = Math.Max(revision, value.Revision);
+                // The oldest contributing timestamp identifies stale dependencies in a composite expression.
+                timestamp = !hasReference || value.Timestamp < timestamp ? value.Timestamp : timestamp;
+                hasReference = true; revision = Math.Max(revision, value.Revision);
                 if (!value.IsGood) throw new ExpressionException($"{reference}: {value.Quality}");
                 return value.Value;
             }
-            Scalar result;
-            switch (binding.Kind)
+            var result = binding.Kind switch
             {
-                case BindingKind.Tag: result = Resolve(ResolveTagPath(binding.Source)); break;
-                case BindingKind.Property: result = Resolve(binding.Source); break;
-                case BindingKind.Expression: result = _expressions.Evaluate(binding.Source, Resolve); break;
-                default: throw new ExpressionException("Unsupported binding type.");
-            }
+                BindingKind.Tag => Resolve(ResolveTagPath(binding.Source)),
+                BindingKind.Property => Resolve(binding.Source),
+                BindingKind.Expression => _expressions.Evaluate(binding.Source, Resolve),
+                _ => throw new ExpressionException("Unsupported binding type.")
+            };
             foreach (var transform in binding.Transforms)
             {
                 var input = result;
@@ -71,18 +73,18 @@ public sealed class ViewInstance
                 {
                     TransformKind.Expression => _expressions.Evaluate(transform.Expression, reference => reference == "value" ? input : Resolve(reference)),
                     TransformKind.Scale => transform.InputMax == transform.InputMin ? throw new ExpressionException("Scale input range is zero.") : Scalar.From(transform.OutputMin + (input.AsNumber() - transform.InputMin) / (transform.InputMax - transform.InputMin) * (transform.OutputMax - transform.OutputMin)),
-                    TransformKind.Format => Scalar.From(input.AsNumber().ToString(transform.Format, CultureInfo.InvariantCulture)),
+                    TransformKind.Format => Scalar.From(NumberFormatting.Format(input.AsNumber(), transform.Format)),
                     TransformKind.Map => transform.Map.TryGetValue(input.ToString(), out var mapped) ? mapped : transform.Map.GetValueOrDefault("*", Scalar.Null),
                     _ => throw new ExpressionException("Unsupported transform.")
                 };
                 if (!result.IsValid()) throw new ExpressionException("Transform result is invalid.");
             }
-            return _values[key] = new(result, quality, stamp, revision);
+            return _values[key] = new(result, quality, timestamp, revision);
         }
         catch (Exception ex) when (ex is ExpressionException or InvalidOperationException or ArgumentException or FormatException)
         {
             _diagnostics.Add(new("BINDING_ERROR", ex.Message, key));
-            return _values[key] = QualifiedValue.Bad(Quality.BadExpression, now);
+            return _values[key] = new(Scalar.Null, quality == Quality.Good ? Quality.BadExpression : quality, timestamp, revision);
         }
         finally { _resolving.Remove(key); }
     }
@@ -108,7 +110,8 @@ public sealed class ViewInstance
             if (matching.Length == 1) target = matching[0];
         }
         if (target is null) throw new ExpressionException("Unknown or ambiguous component: " + owner);
-        return custom ? QualifiedValue.Good(target.Custom.GetValueOrDefault(property), DateTimeOffset.UtcNow) : Read(target, property);
+        if (!custom) return Read(target, property);
+        return target.Custom.TryGetValue(property, out var value) ? QualifiedValue.Good(value, DateTimeOffset.UtcNow) : QualifiedValue.Bad(Quality.BadNotFound, DateTimeOffset.UtcNow);
     }
     public string ResolveTagPath(string source)
     {
