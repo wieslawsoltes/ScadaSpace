@@ -24,6 +24,13 @@ jobs:
           dotnet build src/ScadaSpace.Persistence -c Release
           dotnet build src/ScadaSpace.Layout -c Release
           dotnet build src/ScadaSpace.Graphics -c Release
+      - name: Run deterministic engine regressions
+        run: dotnet run --project tests/ScadaSpace.Tests -c Release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-results
+          path: TestResults
   browser:
     runs-on: ubuntu-latest
     steps:
@@ -35,7 +42,7 @@ jobs:
       - name: Publish Uno WebAssembly application
         run: dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
       - name: Show publish layout
-        run: find artifacts/browser -maxdepth 3 -type f | head -100
+        run: find artifacts/browser -maxdepth 3 -type f | head -100 || true
       - uses: actions/upload-artifact@v4
         with:
           name: browser-app
