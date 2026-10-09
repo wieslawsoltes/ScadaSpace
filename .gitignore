@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+node_modules/
+.vs/
+.idea/
+*.user
+*.log
+.DS_Store
