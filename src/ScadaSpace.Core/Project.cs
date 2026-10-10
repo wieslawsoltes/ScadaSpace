@@ -4,11 +4,11 @@ using System.Text.Json.Serialization;
 namespace ScadaSpace.Core;
 
 public enum LayoutKind { Coordinate, FlexRow, FlexColumn, Column, Breakpoint, Tab }
-public enum BindingKind { Tag, Property, Expression }
+public enum BindingKind { Tag, Property, Expression, ExpressionStructure }
 public enum TransformKind { Expression, Scale, Format, Map }
 public enum ActionKind { WriteTag, ToggleTag, Navigate, OpenPopup, ClosePopup, SendMessage }
 
-public sealed class TransformDefinition
+public sealed partial class TransformDefinition
 {
     public TransformKind Kind { get; set; }
     public string Expression { get; set; } = "value";
@@ -20,7 +20,7 @@ public sealed class TransformDefinition
     public Dictionary<string, Scalar> Map { get; set; } = new(StringComparer.Ordinal);
 }
 
-public sealed class BindingDefinition
+public sealed partial class BindingDefinition
 {
     public BindingKind Kind { get; set; }
     public string Source { get; set; } = "";
@@ -29,7 +29,7 @@ public sealed class BindingDefinition
     public List<TransformDefinition> Transforms { get; set; } = [];
 }
 
-public sealed class EventAction
+public sealed partial class EventAction
 {
     public ActionKind Kind { get; set; }
     public string Target { get; set; } = "";
@@ -37,7 +37,7 @@ public sealed class EventAction
     public Dictionary<string, Scalar> Parameters { get; set; } = new(StringComparer.Ordinal);
 }
 
-public sealed class ComponentNode
+public sealed partial class ComponentNode
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Component";
@@ -68,7 +68,7 @@ public sealed class ComponentNode
     }
 }
 
-public sealed class ViewDefinition
+public sealed partial class ViewDefinition
 {
     public string Path { get; set; } = "Main";
     public double Width { get; set; } = 1000;
@@ -77,7 +77,7 @@ public sealed class ViewDefinition
     public ComponentNode Root { get; set; } = new() { Name = "root", Type = "Container", Width = 1000, Height = 700 };
 }
 
-public sealed class PageDefinition
+public sealed partial class PageDefinition
 {
     public string Path { get; set; } = "/";
     public string View { get; set; } = "Main";
@@ -85,7 +85,7 @@ public sealed class PageDefinition
     public Dictionary<string, Scalar> Parameters { get; set; } = new(StringComparer.Ordinal);
 }
 
-public sealed class TagDefinition
+public sealed partial class TagDefinition
 {
     public string Path { get; set; } = "[default]Tag";
     public ScalarKind DataType { get; set; } = ScalarKind.Number;
@@ -100,7 +100,7 @@ public sealed class TagDefinition
 
 public enum AlarmMode { High, Low, Equal, NotEqual }
 public enum AlarmPriority { Diagnostic, Low, Medium, High, Critical }
-public sealed class AlarmDefinition
+public sealed partial class AlarmDefinition
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "High limit";
@@ -114,7 +114,7 @@ public sealed class AlarmDefinition
     public bool Enabled { get; set; } = true;
 }
 
-public sealed class ProjectDefinition
+public sealed partial class ProjectDefinition
 {
     public int SchemaVersion { get; set; } = 1;
     public string Name { get; set; } = "Water Treatment";
@@ -126,7 +126,7 @@ public sealed class ProjectDefinition
     public Dictionary<string, Dictionary<string, Scalar>> Styles { get; set; } = new(StringComparer.Ordinal);
 }
 
-public static class ProjectCodec
+public static partial class ProjectCodec
 {
     public const int MaximumBytes = 8 * 1024 * 1024;
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
@@ -171,7 +171,7 @@ public static class ProjectCodec
             foreach (var binding in node.Bindings.Values)
             {
                 if (binding is null || binding.Source is null || binding.Source.Length > 16384 || !Enum.IsDefined(binding.Kind) || binding.Transforms is null) { Error("Invalid binding.", path); continue; }
-                if (binding.Bidirectional && (binding.Kind != BindingKind.Tag || binding.Transforms.Count > 0)) Error("Bidirectional writes require an untransformed direct tag binding.", path);
+                if (binding.Bidirectional && (binding.Kind is not (BindingKind.Tag or BindingKind.Property) || binding.Transforms.Count > 0)) Error("Bidirectional writes require an untransformed tag or property binding.", path);
                 foreach (var t in binding.Transforms)
                     if (t is null || !Enum.IsDefined(t.Kind) || t.Map is null || t.Expression is null || t.Format is null || !Finite(t.InputMin) || !Finite(t.InputMax) || !Finite(t.OutputMin) || !Finite(t.OutputMax)) Error("Invalid transform.", path);
             }
