@@ -7,6 +7,7 @@
     <UnoFeatures>SkiaRenderer;</UnoFeatures>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../ScadaSpace.Data/ScadaSpace.Data.csproj" />
     <ProjectReference Include="../ScadaSpace.Graphics/ScadaSpace.Graphics.csproj" />
     <ProjectReference Include="../ScadaSpace.Runtime/ScadaSpace.Runtime.csproj" />
     <ProjectReference Include="../ScadaSpace.Layout/ScadaSpace.Layout.csproj" />

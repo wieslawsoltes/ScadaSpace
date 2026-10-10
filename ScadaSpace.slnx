@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Engines/">
     <Project Path="src/ScadaSpace.Core/ScadaSpace.Core.csproj" />
+    <Project Path="src/ScadaSpace.Data/ScadaSpace.Data.csproj" />
     <Project Path="src/ScadaSpace.Tags/ScadaSpace.Tags.csproj" />
     <Project Path="src/ScadaSpace.Expressions/ScadaSpace.Expressions.csproj" />
     <Project Path="src/ScadaSpace.History/ScadaSpace.History.csproj" />
