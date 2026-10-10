@@ -1,0 +1,25 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <ApplicationTitle>ScadaSpace Designer</ApplicationTitle>
+    <ApplicationId>com.scadaspace.designer</ApplicationId>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <UnoFeatures>SkiaRenderer;</UnoFeatures>
+    <IsUiAutomationMappingEnabled>true</IsUiAutomationMappingEnabled>
+    <WasmShellWebAppBasePath>/ScadaSpace/</WasmShellWebAppBasePath>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ScadaSpace.Controls/ScadaSpace.Controls.csproj" />
+    <ProjectReference Include="../ScadaSpace.Persistence/ScadaSpace.Persistence.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'browserwasm'">
+    <LinkerDescriptor Include="Platforms/WebAssembly/LinkerConfig.xml" />
+    <TrimmerRootDescriptor Include="Platforms/WebAssembly/LinkerConfig.xml" />
+    <!-- Explicit resources are required for startup scripts to reach the published bootstrapper. -->
+    <EmbeddedResource Include="Platforms/WebAssembly/WasmScripts/*.js" />
+  </ItemGroup>
+</Project>

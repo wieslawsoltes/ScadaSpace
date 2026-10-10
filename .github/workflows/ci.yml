@@ -1,0 +1,157 @@
+name: Validate
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build reusable engines and renderer
+        run: |
+          dotnet build src/ScadaSpace.Runtime -c Release
+          dotnet build src/ScadaSpace.Designer -c Release
+          dotnet build src/ScadaSpace.Persistence -c Release
+          dotnet build src/ScadaSpace.Layout -c Release
+          dotnet build src/ScadaSpace.Graphics -c Release
+      - name: Run deterministic engine regressions
+        run: |
+          dotnet run --project tests/ScadaSpace.Tests -c Release
+          dotnet run --project tests/ScadaSpace.Hardening.Tests -c Release
+          dotnet run --project tests/ScadaSpace.Parity.Tests -c Release
+      - name: Pack reusable engine libraries
+        run: |
+          for project in src/*/*.csproj; do
+            case "$project" in *ScadaSpace.App/*|*ScadaSpace.Controls/*) continue;; esac
+            dotnet pack "$project" -c Release --no-build -o artifacts/packages
+          done
+      - name: Verify standalone package consumption
+        run: python tests/packages/verify.py
+      - name: Archive exact source tree
+        if: always()
+        run: |
+          mkdir -p artifacts
+          git archive --format=zip --output=artifacts/ScadaSpace-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-results-and-source
+          path: |
+            TestResults
+            artifacts/ScadaSpace-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-engines
+          path: artifacts/packages
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet workload install wasm-tools
+      - name: Publish Uno WebAssembly application
+        run: dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
+      - name: Pack reusable Uno controls
+        run: dotnet pack src/ScadaSpace.Controls -c Release -o artifacts/uno-packages
+      - name: Install pinned browser test tooling
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Validate the actual browser application
+        run: |
+          mkdir -p artifacts/site
+          ln -s "$PWD/artifacts/browser/wwwroot" artifacts/site/ScadaSpace
+          python -m http.server 8765 --bind 127.0.0.1 --directory artifacts/site > artifacts/server.log 2>&1 &
+          python tests/browser/smoke.py
+          python tests/browser/parity.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-validation
+          path: |
+            TestResults/browser
+            TestResults/browser-parity
+            artifacts/server.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-app
+          path: artifacts/browser
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-controls
+          path: artifacts/uno-packages
+      - name: Prepare Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          touch artifacts/browser/wwwroot/.nojekyll
+          cp artifacts/browser/wwwroot/index.html artifacts/browser/wwwroot/404.html
+          python - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          Path('artifacts/browser/wwwroot/build-info.json').write_text(json.dumps({
+              'commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'],
+              'repository': os.environ['GITHUB_REPOSITORY']
+          }))
+          PYCODE
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: artifacts/browser/wwwroot
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build desktop application
+        run: dotnet build src/ScadaSpace.App -f net10.0-desktop -c Release
+  pages:
+    needs: [core, browser, desktop]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy validated browser application
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify published revision
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python - <<'PYCODE'
+          import json, os, time, urllib.request
+          url = os.environ['SITE_URL'].rstrip('/') + '/build-info.json'
+          for attempt in range(12):
+              try:
+                  request = urllib.request.Request(url + '?revision=' + os.environ['GITHUB_SHA'], headers={'Cache-Control': 'no-cache'})
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      info = json.load(response)
+                  if info['commit'] == os.environ['GITHUB_SHA']:
+                      print('Verified live deployment:', os.environ['SITE_URL'], info['commit'])
+                      break
+              except Exception as error:
+                  print('Waiting for deployment propagation:', error)
+              time.sleep(5)
+          else:
+              raise SystemExit('Live Pages revision did not match the validated commit')
+          PYCODE

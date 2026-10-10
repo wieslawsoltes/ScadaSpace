@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/Engines/">
+    <Project Path="src/ScadaSpace.Core/ScadaSpace.Core.csproj" />
+    <Project Path="src/ScadaSpace.Data/ScadaSpace.Data.csproj" />
+    <Project Path="src/ScadaSpace.Tags/ScadaSpace.Tags.csproj" />
+    <Project Path="src/ScadaSpace.Expressions/ScadaSpace.Expressions.csproj" />
+    <Project Path="src/ScadaSpace.History/ScadaSpace.History.csproj" />
+    <Project Path="src/ScadaSpace.Alarms/ScadaSpace.Alarms.csproj" />
+    <Project Path="src/ScadaSpace.Runtime/ScadaSpace.Runtime.csproj" />
+    <Project Path="src/ScadaSpace.Designer/ScadaSpace.Designer.csproj" />
+    <Project Path="src/ScadaSpace.Layout/ScadaSpace.Layout.csproj" />
+    <Project Path="src/ScadaSpace.Persistence/ScadaSpace.Persistence.csproj" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="src/ScadaSpace.Graphics/ScadaSpace.Graphics.csproj" />
+    <Project Path="src/ScadaSpace.Controls/ScadaSpace.Controls.csproj" />
+    <Project Path="src/ScadaSpace.App/ScadaSpace.App.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/ScadaSpace.Tests/ScadaSpace.Tests.csproj" />
+    <Project Path="tests/ScadaSpace.Hardening.Tests/ScadaSpace.Hardening.Tests.csproj" />
+    <Project Path="tests/ScadaSpace.Parity.Tests/ScadaSpace.Parity.Tests.csproj" />
+  </Folder>
+</Solution>
