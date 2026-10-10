@@ -68,6 +68,9 @@ public partial class DesignerSurface : Grid, IDisposable
         Document = document; ViewPath = path; Preview = preview;
         CancelDrag(); Host.Load(runtime, path, editing: !preview, session: session);
         var view = Host.Instance!.View;
+        // Selection belongs to the displayed view; stale inspectors must not read foreign nodes.
+        var members = view.Root.DescendantsAndSelf().Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        if (document.Selection.Any(id => !members.Contains(id))) document.Select(null);
         _board.Width = view.Width + 20; _board.Height = view.Height + 20;
         _layers.Width = view.Width; _layers.Height = view.Height;
         _adorner.IsHitTestVisible = !preview; _adorner.Visibility = preview ? Visibility.Collapsed : Visibility.Visible;
