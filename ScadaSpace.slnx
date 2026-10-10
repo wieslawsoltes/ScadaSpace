@@ -18,5 +18,6 @@
   <Folder Name="/Tests/">
     <Project Path="tests/ScadaSpace.Tests/ScadaSpace.Tests.csproj" />
     <Project Path="tests/ScadaSpace.Hardening.Tests/ScadaSpace.Hardening.Tests.csproj" />
+    <Project Path="tests/ScadaSpace.Parity.Tests/ScadaSpace.Parity.Tests.csproj" />
   </Folder>
 </Solution>

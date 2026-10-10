@@ -4,12 +4,12 @@ using System.Text.Json.Serialization;
 
 namespace ScadaSpace.Core;
 
-public enum ScalarKind { Null, Number, Boolean, String }
+public enum ScalarKind { Null, Number, Boolean, String, Object, Array }
 public enum Quality { Good, Uncertain, Stale, BadNotFound, BadType, BadExpression, BadDisabled }
 
 /// <summary>A closed, immutable value type. It never carries executable code or mutable JSON objects.</summary>
 [JsonConverter(typeof(ScalarJsonConverter))]
-public readonly record struct Scalar(ScalarKind Kind, double Number = 0, bool Boolean = false, string? Text = null)
+public readonly partial record struct Scalar(ScalarKind Kind, double Number = 0, bool Boolean = false, string? Text = null, StructuredValue? Structured = null)
 {
     public static Scalar Null => default;
     public static Scalar From(double value) => double.IsFinite(value) ? new(ScalarKind.Number, value) : throw new ArgumentOutOfRangeException(nameof(value), "Values must be finite.");
@@ -35,6 +35,7 @@ public readonly record struct Scalar(ScalarKind Kind, double Number = 0, bool Bo
         ScalarKind.Number => Number.ToString("0.###", CultureInfo.InvariantCulture),
         ScalarKind.Boolean => Boolean ? "true" : "false",
         ScalarKind.String => Text ?? "",
+        ScalarKind.Object or ScalarKind.Array => ToJson(),
         _ => ""
     };
     public static Scalar Parse(string text, ScalarKind kind) => kind switch
@@ -43,9 +44,18 @@ public readonly record struct Scalar(ScalarKind Kind, double Number = 0, bool Bo
         ScalarKind.Boolean => From(bool.Parse(text)),
         ScalarKind.String => From(text),
         ScalarKind.Null => Null,
+        ScalarKind.Object or ScalarKind.Array => ParseStructured(text, kind),
         _ => throw new FormatException("Unknown scalar type.")
     };
-    public bool IsValid() => Enum.IsDefined(Kind) && (Kind != ScalarKind.Number || double.IsFinite(Number)) && (Text?.Length ?? 0) <= 65536;
+    private static Scalar ParseStructured(string text, ScalarKind kind)
+    {
+        var value = FromJson(text);
+        return value.Kind == kind ? value : throw new FormatException("JSON does not match the property type.");
+    }
+    public bool IsValid() => Enum.IsDefined(Kind) && double.IsFinite(Number) && (Text?.Length ?? 0) <= 65536 &&
+        (Kind is ScalarKind.Object or ScalarKind.Array
+            ? Structured is not null && Structured.IsArray == (Kind == ScalarKind.Array)
+            : Structured is null);
 }
 
 /// <summary>Explicit, reflection-free tagged-value wire format, shared by desktop and WebAssembly.</summary>
@@ -75,6 +85,8 @@ public sealed class ScalarJsonConverter : JsonConverter<Scalar>
                 ScalarKind.Number when fields.TryGetValue("number", out var n) => Scalar.From(n.GetDouble()),
                 ScalarKind.Boolean when fields.TryGetValue("boolean", out var b) => Scalar.From(b.GetBoolean()),
                 ScalarKind.String when fields.TryGetValue("text", out var s) && s.ValueKind == JsonValueKind.String => Scalar.From(s.GetString()),
+                ScalarKind.Array when fields.TryGetValue("items", out var items) && items.ValueKind == JsonValueKind.Array => Scalar.Array(items.EnumerateArray().Select(x => x.Deserialize<Scalar>(options))),
+                ScalarKind.Object when fields.TryGetValue("fields", out var values) && values.ValueKind == JsonValueKind.Object => Scalar.Object(values.EnumerateObject().Select(x => new KeyValuePair<string, Scalar>(x.Name, x.Value.Deserialize<Scalar>(options)))),
                 _ => throw new JsonException("The scalar payload does not match its kind.")
             };
             if (!result.IsValid()) throw new JsonException("Invalid scalar payload.");
@@ -91,6 +103,19 @@ public sealed class ScalarJsonConverter : JsonConverter<Scalar>
         writer.WriteNumber("number", value.Number);
         writer.WriteBoolean("boolean", value.Boolean);
         if (value.Text is null) writer.WriteNull("text"); else writer.WriteString("text", value.Text);
+        if (value.Kind == ScalarKind.Array)
+        {
+            writer.WriteStartArray("items");
+            foreach (var item in value.Items) JsonSerializer.Serialize(writer, item, options);
+            writer.WriteEndArray();
+        }
+        if (value.Kind == ScalarKind.Object)
+        {
+            writer.WriteStartObject("fields");
+            foreach (var (key, item) in value.Fields.OrderBy(p => p.Key, StringComparer.Ordinal))
+            { writer.WritePropertyName(key); JsonSerializer.Serialize(writer, item, options); }
+            writer.WriteEndObject();
+        }
         writer.WriteEndObject();
     }
 }
