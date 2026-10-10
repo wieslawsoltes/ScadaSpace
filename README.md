@@ -1,6 +1,6 @@
 # ScadaSpace
 
-An independent industrial visualization workbench built with **C#, Uno Platform and Skia**, targeting desktop and WebAssembly. Its engines, graphics and controls are separated into **eleven reusable libraries**.
+An independent industrial visualization workbench built with **C#, Uno Platform and Skia**, targeting desktop and WebAssembly. Its engines, graphics and controls are separated into **twelve reusable libraries**.
 
 > **Scope:** this is an implemented simulation workbench, not full Ignition Perspective parity, a drop-in replacement, or a production-qualified industrial-control system. The demonstration never connects to live equipment. See the [compatibility matrix](docs/parity.md) for explicit boundaries.
 
@@ -16,7 +16,8 @@ The included water-treatment project has five views, eight typed simulated tags,
 
 | Library | Responsibility |
 |---|---|
-| `ScadaSpace.Core` | Project schema, components, tagged scalar values, qualified values, diagnostics and audit records |
+| `ScadaSpace.Core` | Project schema, components, immutable scalar/object/array values, qualified values, diagnostics and audit records |
+| `ScadaSpace.Data` | Typed document tables, stable row identities, multi-key queries, immutable edits and CSV |
 | `ScadaSpace.Tags` | Thread-safe memory provider, typed/ranged writes, optimistic revision checks, ordered subscriptions |
 | `ScadaSpace.Expressions` | Bounded expression compiler/interpreter, dependency discovery and lazy evaluation |
 | `ScadaSpace.History` | Bounded per-tag rings, time queries, aggregates, quality-preserving decimation and CSV |
@@ -42,6 +43,7 @@ Install a .NET 10 SDK. `global.json` pins the Uno SDK; project files pin SkiaSha
 # Engine regressions: no UI workloads required.
 dotnet run --project tests/ScadaSpace.Tests -c Release
 dotnet run --project tests/ScadaSpace.Hardening.Tests -c Release
+dotnet run --project tests/ScadaSpace.Parity.Tests -c Release
 
 # Desktop: the host selects the operating-system backend.
 dotnet run --project src/ScadaSpace.App -f net10.0-desktop
@@ -60,7 +62,13 @@ Open `http://localhost:8765/ScadaSpace/`. To host at a different path, override 
 
 `F5` toggles preview; `Ctrl+S` saves; `Ctrl+Z/Y` undo/redo; `Ctrl+C/X/V/D` copy/cut/paste/duplicate. Delete removes selected components. Arrow keys nudge, with Shift using eight-unit steps. Ctrl/Shift-click extends selection. The lower-right selection handle resizes. Dragging a palette entry inserts it at the drop location.
 
-Click the circle beside a property to configure a direct/indirect tag, property or expression binding. Bidirectional writes require an enabled direct tag binding with no transform. Transform chains support expressions, linear scale, numeric format and lookup maps. Binding errors retain bad/stale quality instead of presenting a failed computation as a valid process value.
+Click the circle beside a property to configure a direct/indirect tag, property or expression binding. Structured values and expression structures are also supported by the model/runtime API; the dedicated nested-property tree editor is not shipped. Bidirectional writes support enabled tag or property bindings without transforms, including nested paths and property aliases. Writes retain provider or instance revision checks. Transform chains support expressions, linear scale, numeric format and lookup maps. Binding errors retain bad/stale quality instead of presenting a failed computation as a valid process value.
+
+## Structured data and view reuse
+
+Object and array properties are immutable, bounded and structurally comparable. Nested bindings can read and write fields such as `root.custom.model.rows[0].value`. Runtime edits are isolated per view and do not alter exported project defaults. `ExpressionStructure` evaluates JSON-template leaves into an object/array; this is ScadaSpace syntax, not an Ignition archive format.
+
+Data tables support numeric sorting, filtering, source-row identity, and validated double-click cell editing with revision checks. Embedded views and repeaters react to parameter, path and instance-count changes without recreating unchanged children. See [structured runtime and table APIs](docs/structured-runtime.md) for configuration and limits.
 
 ## Boundaries and security
 

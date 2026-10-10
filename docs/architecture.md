@@ -2,15 +2,15 @@
 
 ## Dependency direction
 
-`Core` has no presentation dependency. `Tags` and `Expressions` depend on Core. History and Alarms consume the tag-provider contract. Runtime composes those engines and owns view instances. Designer, Layout and Persistence operate on Core models. Graphics depends on Skia and history data, not Uno. Controls adapts the engines and graphics to Uno; App contains application menus, browser storage and window policy.
+`Core` has no presentation dependency. `Tags` and `Expressions` depend on Core. History and Alarms consume the tag-provider contract. Runtime composes those engines and owns view instances. Designer, Layout, Persistence and Data operate on Core models. Data exposes immutable document-table queries independently of the UI. Graphics depends on Skia and history data, not Uno. Controls adapts the engines and graphics to Uno; App contains application menus, browser storage and window policy.
 
 No reusable library reaches into `ScadaSpace.App`. Symbols and charts accept plain data, and a model can be tested without launching the UI.
 
 ## Qualified data flow
 
-A tag write is validated for path, type, engineering limits, writability and optional expected revision. A successful write creates an immutable `QualifiedValue` containing the scalar, quality, UTC timestamp and monotonic provider revision. Subscriber notifications are queued in commit order and dispatched outside the provider lock. Reentrant writes enqueue rather than recursively notifying other listeners out of order. Subscriber exceptions do not roll back committed values.
+A tag write is validated for path, type, engineering limits, writability and optional expected revision. A successful write creates an immutable `QualifiedValue` containing the immutable scalar/object/array value, quality, UTC timestamp and monotonic provider revision. Subscriber notifications are queued in commit order and dispatched outside the provider lock. Reentrant writes enqueue rather than recursively notifying other listeners out of order. Subscriber exceptions do not roll back committed values.
 
-A view instance owns its parameter dictionary and evaluated property cache. Evaluation resolves references recursively, detects cycles and enforces a depth limit. Direct, indirect, property and expression bindings feed an ordered transform chain. Bad dependencies retain their quality, and a composite expression records the oldest contributing timestamp. Runtime edits without a binding remain instance-local; they do not alter the saved view definition.
+A view instance owns its parameter dictionary and evaluated property cache. Evaluation resolves references recursively, detects cycles and enforces a depth limit. Direct, indirect, property, expression and expression-structure bindings feed an ordered transform chain. Nested property paths copy only modified branches; property writeback follows aliases and respects read-only sources and optimistic revisions. Bad dependencies retain their quality, and a composite expression records the oldest contributing timestamp. Runtime edits without a binding remain instance-local; they do not alter the saved view definition.
 
 The memory provider is synchronous. Under concurrent/reentrant publication, a write can return after its value is committed but before another thread has drained its notification. A disposed subscription prevents future capture but cannot retract a callback already queued by a committed write.
 
@@ -34,7 +34,7 @@ Position alignment is restricted to siblings in a coordinate container. Flow-man
 
 `SymbolRenderer.Draw` and `ChartRenderer.Draw` accept a caller's `SKCanvas` and bounds. Paint and font objects are reused within a draw operation and deterministically disposed. The Uno `HmiSymbol` and `HmiChart` adapters use `SKCanvasElement.RenderOverride`, allowing Uno to compose these primitives into its existing Skia surface. Native Uno controls remain responsible for text editing, focus, keyboard handling, toggles and dropdowns.
 
-`HmiDataTable` draws only visible rows into the canvas and preserves selection across refreshes. Its current text filtering/sorting scans in-memory rows; it is not a server-backed million-row database grid. It needs further accessibility work because custom-drawn rows are not individual native accessibility peers.
+`HmiDataTable` draws only visible rows into the canvas and preserves selection across refreshes. Typed cells sort numerically where applicable. Double-click editing captures a source snapshot and revision; applying an edit to a sorted or filtered row still updates its source identity. Its current filtering/sorting scans in-memory rows; it is not a server-backed million-row database grid. It needs further accessibility work because custom-drawn rows are not individual native accessibility peers.
 
 ## Reuse examples
 

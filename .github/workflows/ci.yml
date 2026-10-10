@@ -1,7 +1,7 @@
 name: Validate
 on:
   push:
-    branches: [main, feat/perspective-workbench]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -35,6 +35,8 @@ jobs:
             case "$project" in *ScadaSpace.App/*|*ScadaSpace.Controls/*) continue;; esac
             dotnet pack "$project" -c Release --no-build -o artifacts/packages
           done
+      - name: Verify standalone package consumption
+        run: python tests/packages/verify.py
       - name: Archive exact source tree
         if: always()
         run: |
@@ -96,6 +98,14 @@ jobs:
         run: |
           touch artifacts/browser/wwwroot/.nojekyll
           cp artifacts/browser/wwwroot/index.html artifacts/browser/wwwroot/404.html
+          python - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          Path('artifacts/browser/wwwroot/build-info.json').write_text(json.dumps({
+              'commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'],
+              'repository': os.environ['GITHUB_REPOSITORY']
+          }))
+          PYCODE
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
@@ -124,3 +134,24 @@ jobs:
       - name: Deploy validated browser application
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify published revision
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python - <<'PYCODE'
+          import json, os, time, urllib.request
+          url = os.environ['SITE_URL'].rstrip('/') + '/build-info.json'
+          for attempt in range(12):
+              try:
+                  request = urllib.request.Request(url + '?revision=' + os.environ['GITHUB_SHA'], headers={'Cache-Control': 'no-cache'})
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      info = json.load(response)
+                  if info['commit'] == os.environ['GITHUB_SHA']:
+                      print('Verified live deployment:', os.environ['SITE_URL'], info['commit'])
+                      break
+              except Exception as error:
+                  print('Waiting for deployment propagation:', error)
+              time.sleep(5)
+          else:
+              raise SystemExit('Live Pages revision did not match the validated commit')
+          PYCODE
