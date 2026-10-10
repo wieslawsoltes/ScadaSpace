@@ -42,7 +42,8 @@ public partial class ViewHost
             var input = new TextBox { Header = column.Title, Text = row.Cells[index].ToString(), MinWidth = 320, AcceptsReturn = kind is ScalarKind.Array or ScalarKind.Object };
             AutomationProperties.SetAutomationId(input, "table-cell-editor");
             var error = new TextBlock { Foreground = ControlTheme.Brush("#B14E37"), TextWrapping = TextWrapping.Wrap };
-            var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Edit cell", PrimaryButtonText = "Apply", CloseButtonText = "Cancel", Content = new StackPanel { Spacing = 8, Children = { input, error } } };
+            var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Edit cell", DefaultButton = ContentDialogButton.Primary, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", Content = new StackPanel { Spacing = 8, Children = { input, error } } };
+            dialog.Opened += (_, _) => input.Focus(FocusState.Programmatic);
             dialog.PrimaryButtonClick += (_, args) =>
             {
                 try

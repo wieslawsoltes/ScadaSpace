@@ -73,12 +73,14 @@ jobs:
           ln -s "$PWD/artifacts/browser/wwwroot" artifacts/site/ScadaSpace
           python -m http.server 8765 --bind 127.0.0.1 --directory artifacts/site > artifacts/server.log 2>&1 &
           python tests/browser/smoke.py
+          python tests/browser/parity.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-validation
           path: |
             TestResults/browser
+            TestResults/browser-parity
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()

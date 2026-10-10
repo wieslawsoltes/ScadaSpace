@@ -3,7 +3,7 @@ using ScadaSpace.Core;
 
 namespace ScadaSpace.App;
 
-internal static class BrowserServices
+internal static partial class BrowserServices
 {
     private const string StorageKey = "scadaspace.project.v1";
     private static string DataDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ScadaSpace");
@@ -69,6 +69,7 @@ internal static class BrowserServices
     public static void SetTelemetry(object value)
     {
 #if __WASM__
+        PublishViewObservations();
         // Read-only observations for browser automation. No JS-to-managed command/evaluation backdoor is exposed.
         Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.scadaApp=" + JsonSerializer.Serialize(value, ProjectCodec.Options) + "; document.documentElement.dataset.scadaspaceReady='true'; '';");
 #endif
