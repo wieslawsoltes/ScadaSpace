@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ScadaSpace.Graphics;
+using ScadaSpace.Core;
+using ScadaSpace.Data;
 using SkiaSharp;
 using Uno.WinUI.Graphics2DSK;
 using Windows.Foundation;
@@ -8,7 +10,7 @@ using Windows.Foundation;
 namespace ScadaSpace.Controls;
 
 public sealed record TableColumn(string Key, string Title, double Weight = 1);
-public sealed record TableRow(string Key, IReadOnlyList<string> Cells, string? Accent = null);
+public sealed record TableRow(string Key, IReadOnlyList<string> Cells, string? Accent = null, IReadOnlyList<Scalar>? Values = null);
 
 /// <summary>Virtualized drawing table. Only visible rows are submitted to Skia; filtering and sorting do not rebuild controls.</summary>
 public partial class HmiDataTable : Grid
@@ -18,6 +20,8 @@ public partial class HmiDataTable : Grid
     private readonly TextBlock _count = ControlTheme.Text("0 rows", 10);
     private readonly StackPanel _commands = new() { Orientation = Orientation.Horizontal, Spacing = 4 };
     public event Action<string?>? SelectionChanged;
+    public event Action<string, int>? CellEditRequested;
+    public IReadOnlyList<TableRow> VisibleRows => _surface.VisibleRows;
     public string? SelectedKey => _surface.SelectedKey;
     public IReadOnlyList<TableRow> Rows => _surface.Rows;
     public HmiDataTable()
@@ -28,8 +32,9 @@ public partial class HmiDataTable : Grid
         var footer = new Grid { Padding = new Thickness(5, 1, 5, 1), Background = ControlTheme.Brush("#F0F3F5") };
         footer.ColumnDefinitions.Add(new()); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         footer.Children.Add(_count); Grid.SetColumn(_commands, 1); footer.Children.Add(_commands); Grid.SetRow(footer, 2); Children.Add(footer);
-        _filter.TextChanged += (_, _) => { _surface.Filter = _filter.Text; _surface.Refresh(); };
+        _filter.TextChanged += (_, _) => { _surface.Filter = _filter.Text; _surface.Refresh(); _count.Text = $"{_surface.VisibleCount} rows"; };
         _surface.SelectionChanged += key => SelectionChanged?.Invoke(key);
+        _surface.CellEditRequested += (key, column) => CellEditRequested?.Invoke(key, column);
         _surface.ScrollChanged += () => _count.Text = $"{_surface.VisibleCount} rows · scroll to browse";
     }
     public void AddCommand(string caption, Action<string> action)
@@ -53,6 +58,8 @@ public partial class HmiDataTable : Grid
         public IReadOnlyList<TableRow> Rows { get; set; } = [];
         public string Filter { get; set; } = "";
         public string? SelectedKey { get; private set; }
+        public IReadOnlyList<TableRow> VisibleRows => Array.AsReadOnly(_visible);
+        public event Action<string, int>? CellEditRequested;
         public int VisibleCount => _visible.Length;
         public event Action<string?>? SelectionChanged;
         public event Action? ScrollChanged;
@@ -73,6 +80,15 @@ public partial class HmiDataTable : Grid
                 }
                 e.Handled = true;
             };
+            DoubleTapped += (_, e) =>
+            {
+                var point = e.GetPosition(this);
+                var index = _offset + (int)((point.Y - HeaderHeight) / RowHeight);
+                var column = Array.FindIndex(_edges, x => point.X < x);
+                if (point.Y >= HeaderHeight && index >= 0 && index < _visible.Length && column >= 0)
+                    CellEditRequested?.Invoke(_visible[index].Key, column);
+                e.Handled = true;
+            };
             PointerWheelChanged += (_, e) =>
             {
                 _offset = Math.Clamp(_offset - Math.Sign(e.GetCurrentPoint(this).Properties.MouseWheelDelta) * 3, 0, MaxOffset());
@@ -85,7 +101,9 @@ public partial class HmiDataTable : Grid
         {
             IEnumerable<TableRow> query = Rows;
             if (!string.IsNullOrWhiteSpace(Filter)) query = query.Where(r => r.Cells.Any(c => c.Contains(Filter, StringComparison.OrdinalIgnoreCase)));
-            if (_sort >= 0) query = _descending ? query.OrderByDescending(r => r.Cells.ElementAtOrDefault(_sort), StringComparer.OrdinalIgnoreCase) : query.OrderBy(r => r.Cells.ElementAtOrDefault(_sort), StringComparer.OrdinalIgnoreCase);
+            if (_sort >= Columns.Count) _sort = -1;
+            Scalar SortValue(TableRow row) => row.Values is { } values && _sort < values.Count ? values[_sort] : Scalar.From(row.Cells.ElementAtOrDefault(_sort));
+            if (_sort >= 0) query = _descending ? query.OrderByDescending(SortValue, PropertyValueComparer.Instance) : query.OrderBy(SortValue, PropertyValueComparer.Instance);
             _visible = query.ToArray(); _offset = Math.Min(_offset, MaxOffset());
             if (SelectedKey is not null && !Rows.Any(r => r.Key == SelectedKey)) SelectedKey = null;
             Invalidate();

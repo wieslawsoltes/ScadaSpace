@@ -16,7 +16,6 @@ public partial class ViewHost : Canvas, IDisposable
 {
     private readonly List<Action> _refresh = [];
     private readonly List<ViewHost> _embedded = [];
-    private readonly Dictionary<string, Scalar> _localValues = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FrameworkElement> _elements = new(StringComparer.Ordinal);
     private bool _updating;
     private int _depth;
@@ -32,7 +31,7 @@ public partial class ViewHost : Canvas, IDisposable
 
     public void Load(ProjectRuntime runtime, string path, IReadOnlyDictionary<string, Scalar>? parameters = null, bool editing = false, RuntimeSession? session = null, int depth = 0, string ancestry = "")
     {
-        Dispose(); Children.Clear(); _elements.Clear(); _localValues.Clear();
+        Dispose(); Children.Clear(); _elements.Clear();
         if (depth > 12 || ancestry.Split('|').Contains(path, StringComparer.Ordinal)) throw new InvalidOperationException("Recursive embedded view: " + path);
         Runtime = runtime; Session = session ?? new(runtime); Instance = runtime.CreateView(path, parameters); IsEditing = editing;
         _depth = depth; _ancestry = ancestry + "|" + path;
@@ -55,45 +54,6 @@ public partial class ViewHost : Canvas, IDisposable
             foreach (var host in _embedded) host.Refresh();
         }
         finally { _updating = false; }
-    }
-    public QualifiedValue Read(ComponentNode node, string property)
-    {
-        if (Instance is null) return QualifiedValue.Bad(Quality.BadDisabled, DateTimeOffset.UtcNow);
-        if (!node.Bindings.ContainsKey(property) && _localValues.TryGetValue(node.Id + "." + property, out var value)) return QualifiedValue.Good(value, DateTimeOffset.UtcNow);
-        return Instance.Read(node, property);
-    }
-    private Scalar Value(ComponentNode node, string property, Scalar fallback = default)
-    {
-        if (!node.Props.ContainsKey(property) && !node.Bindings.ContainsKey(property)) return fallback;
-        return Read(node, property).Value;
-    }
-    private double Number(ComponentNode node, string property, double fallback = 0)
-    { try { return Value(node, property, Scalar.From(fallback)).AsNumber(); } catch (InvalidOperationException) { return fallback; } }
-    private string Text(ComponentNode node, string property, string fallback = "") => Value(node, property, Scalar.From(fallback)).ToString();
-    private bool Flag(ComponentNode node, string property, bool fallback = false) => Value(node, property, Scalar.From(fallback)).AsBoolean();
-    private void Write(ComponentNode node, string property, Scalar value)
-    {
-        if (_updating || IsEditing || Instance is null || Session is null) return;
-        if (node.Bindings.ContainsKey(property))
-        {
-            var old = Read(node, property);
-            var result = Instance.Write(node, property, value, Session.Actor, old.Revision);
-            if (!result.Success) Error?.Invoke(result.Message);
-        }
-        else _localValues[node.Id + "." + property] = value;
-        ValueChanged?.Invoke(); Refresh();
-    }
-    private void Action(ComponentNode node, string eventName)
-    {
-        if (IsEditing) return;
-        try { Session?.Dispatch(node, eventName); ValueChanged?.Invoke(); }
-        catch (InvalidOperationException ex) { Error?.Invoke(ex.Message); }
-    }
-    private bool Writable(ComponentNode node, string property)
-    {
-        if (IsEditing || !Flag(node, "enabled", true)) return false;
-        if (!node.Bindings.TryGetValue(property, out var binding)) return true;
-        return binding.Enabled && binding.Kind == BindingKind.Tag && binding.Bidirectional && binding.Transforms.Count == 0 && Read(node, property).IsGood;
     }
     private FrameworkElement BuildNode(ComponentNode node)
     {
@@ -142,7 +102,7 @@ public partial class ViewHost : Canvas, IDisposable
             case "NumericEntry":
                 var number = new NumberBox { FontSize = 13, MinWidth = 0, MinHeight = 0, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
                 number.ValueChanged += (_, e) => { if (double.IsFinite(e.NewValue)) Write(node, "value", Scalar.From(e.NewValue)); };
-                _refresh.Add(() => { number.Minimum = Number(node, "minimum"); number.Maximum = Math.Max(number.Minimum, Number(node, "maximum", 100)); number.SmallChange = Math.Max(.001, Number(node, "step", 1)); if (!number.FocusState.Equals(FocusState.Unfocused) && !_updating) return; number.Value = Number(node, "value"); number.IsEnabled = Writable(node, "value"); }); element = number; break;
+                _refresh.Add(() => { number.Minimum = Number(node, "minimum"); number.Maximum = Math.Max(number.Minimum, Number(node, "maximum", 100)); number.SmallChange = Math.Max(.001, Number(node, "step", 1)); if (number.FocusState == FocusState.Unfocused) number.Value = Number(node, "value"); number.IsEnabled = Writable(node, "value"); }); element = number; break;
             case "TextField":
                 var text = new TextBox { FontSize = 13, MinWidth = 0, MinHeight = 0, Padding = new Thickness(6, 3, 6, 3) };
                 text.LostFocus += (_, _) => Write(node, "text", Scalar.From(text.Text));
@@ -186,24 +146,9 @@ public partial class ViewHost : Canvas, IDisposable
                     table.AddCommand("Acknowledge", key => { if (!IsEditing && Guid.TryParse(key, out var id)) { Runtime!.Alarms.Acknowledge(id, Session!.Actor); Refresh(); ValueChanged?.Invoke(); } });
                     table.AddCommand("Shelve 5m", key => { if (!IsEditing && Guid.TryParse(key, out var id)) { Runtime!.Alarms.Shelve(id, TimeSpan.FromMinutes(5), Session!.Actor); Refresh(); ValueChanged?.Invoke(); } });
                 }
-                _refresh.Add(() => RefreshTable(node, table)); element = table; break;
+                ConnectTable(node, table); element = table; break;
             case "EmbeddedView": case "FlexRepeater":
-                var panel = new Grid();
-                var path = node.Text("view"); var count = node.Type == "FlexRepeater" ? Math.Clamp((int)node.Number("count", 1), 0, 100) : 1;
-                for (var i = 0; i < count; i++)
-                {
-                    panel.ColumnDefinitions.Add(new());
-                    var parameters = node.Props.Where(p => p.Key.StartsWith("param.", StringComparison.Ordinal)).ToDictionary(p => p.Key[6..], p => p.Value, StringComparer.Ordinal);
-                    if (node.Type == "FlexRepeater") parameters["index"] = Scalar.From(i);
-                    try
-                    {
-                        var child = new ViewHost(); child.Error += message => Error?.Invoke(message); child.Load(Runtime!, path, parameters, IsEditing, Session, _depth + 1, _ancestry);
-                        var box = new Viewbox { Child = child, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(node.Number("gap", 4) / 2) };
-                        Grid.SetColumn(box, i); panel.Children.Add(box); _embedded.Add(child);
-                    }
-                    catch (InvalidOperationException ex) { panel.Children.Add(ControlTheme.Text(ex.Message)); }
-                }
-                element = panel; break;
+                element = BuildEmbedded(node); break;
             default: element = ControlTheme.Text("Unsupported component: " + node.Type, 12, "#B94A37"); break;
         }
         element.MinWidth = 0; element.MinHeight = 0;
@@ -224,30 +169,8 @@ public partial class ViewHost : Canvas, IDisposable
         }
         return element;
     }
-    private void RefreshTable(ComponentNode node, HmiDataTable table)
-    {
-        if (Runtime is null) return;
-        if (node.Type == "AlarmStatusTable")
-        {
-            table.SetData([new("priority", "Priority", .7), new("name", "Alarm", 2), new("state", "State", 1.5), new("time", "Active (UTC)", 1)], Runtime.Alarms.Status(Flag(node, "showShelved", true)).Select(e => new TableRow(e.EventId.ToString(), [e.Priority.ToString(), e.Name, e.State, e.ActiveTime.UtcDateTime.ToString("HH:mm:ss")], e.Active ? "#D1903E" : "#78A290")).ToArray());
-        }
-        else if (node.Type == "AlarmJournalTable")
-            table.SetData([new("time", "Timestamp (UTC)"), new("name", "Alarm", 2), new("transition", "Transition"), new("actor", "Actor")], Runtime.Alarms.Journal().Reverse().Select(e => new TableRow(e.Sequence.ToString(), [e.Timestamp.UtcDateTime.ToString("HH:mm:ss"), e.Name, e.Transition, e.Actor])).ToArray());
-        else if (Text(node, "source", "tags") == "tags")
-            table.SetData([new("path", "Tag path", 2.5), new("value", "Value"), new("unit", "Unit", .6), new("quality", "Quality")], Runtime.Tags.Browse(Text(node, "filter")).Select(d => { var value = Runtime.Tags.Read(d.Path); return new TableRow(d.Path, [d.Path, value.Value.ToString(), d.Unit, value.Quality.ToString()]); }).ToArray());
-        else
-        {
-            var data = Text(node, "data", "[]");
-            if (data.Length > 1024 * 1024) throw new FormatException("Table data exceeds 1 MiB.");
-            using var json = JsonDocument.Parse(data);
-            if (json.RootElement.ValueKind != JsonValueKind.Array) throw new FormatException("Table data must be an array of objects.");
-            var objects = json.RootElement.EnumerateArray().Take(10000).ToArray();
-            var keys = objects.Where(x => x.ValueKind == JsonValueKind.Object).SelectMany(x => x.EnumerateObject().Select(p => p.Name)).Distinct(StringComparer.Ordinal).Take(32).ToArray();
-            table.SetData(keys.Select(k => new TableColumn(k, k)).ToArray(), objects.Select((o, i) => new TableRow(i.ToString(), keys.Select(k => o.ValueKind == JsonValueKind.Object && o.TryGetProperty(k, out var v) ? v.ToString() : "").ToArray())).ToArray());
-        }
-    }
-    public void Dispose()
-    { foreach (var host in _embedded) host.Dispose(); _embedded.Clear(); _refresh.Clear(); }
+    public new void Dispose()
+    { foreach (var host in _embedded) host.Dispose(); _embedded.Clear(); _refresh.Clear(); Instance = null; }
     private partial class ModelPanel(ComponentNode node) : Canvas
     {
         private readonly Dictionary<string, FrameworkElement> _children = new(StringComparer.Ordinal);
