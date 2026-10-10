@@ -173,7 +173,7 @@ public sealed class ViewInstance
         _ => template
     };
     private static QualifiedValue Extract(QualifiedValue parent, string path) => !parent.IsGood ? parent : PropertyPath.Parse(path).TryRead(parent.Value, out var value) ? parent with { Value = value } : parent with { Value = Scalar.Null, Quality = Quality.BadNotFound };
-    private static (string Root, string Rest) Split(string path)
+    private static (string Root, string Suffix) Split(string path)
     {
         var split = path.IndexOfAny(['.', '[']);
         return split < 0 ? (path, "") : (path[..split], Tail(path, split));
