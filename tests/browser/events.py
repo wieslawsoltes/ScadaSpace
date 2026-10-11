@@ -83,6 +83,9 @@ with sync_playwright() as p:
         check('onActionPerformed executes the enabled action and skips the disabled one',process_value()==21)
         component('ClickTarget');value_is(17)
         check('native onClick events execute configured declarative actions',process_value()==17)
+        # A single-click followed immediately by dblclick is a three-tap gesture.
+        # Uno's managed recognizer uses a 500 ms multi-tap interval; isolate test gestures.
+        page.wait_for_timeout(600)
         box=app()['components']['ClickTarget']['bounds'];page.mouse.dblclick(box['x']+box['width']/2,box['y']+box['height']/2);value_is(51)
         check('native double-click raises onDoubleClick',process_value()==51)
         component('ClickTarget',button='right');value_is(61)
