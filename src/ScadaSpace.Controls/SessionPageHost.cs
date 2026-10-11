@@ -68,9 +68,10 @@ public partial class SessionPageHost : Grid, IDisposable
         _refreshing = true;
         try
         {
+            var context = PageContext();
             if (_entry != current.EntryId)
             {
-                PrimaryHost.Load(_runtime, current.Page.View, current.Parameters, session: _session);
+                PrimaryHost.Load(_runtime, current.Page.View, current.Parameters, session: _session, pageProperties: context);
                 _entry = current.EntryId;
             }
             var docks = _session.Docks;
@@ -80,7 +81,7 @@ public partial class SessionPageHost : Grid, IDisposable
                 var id = dock.Definition.Id;
                 if (!_regions.TryGetValue(id, out var region))
                 {
-                    var host = new ViewHost(); host.Load(_runtime, dock.Definition.View, dock.Parameters, session: _session);
+                    var host = new ViewHost(); host.Load(_runtime, dock.Definition.View, dock.Parameters, session: _session, pageProperties: context);
                     host.Error += message => Error?.Invoke(message); host.ValueChanged += () => ValueChanged?.Invoke();
                     var frame = Frame(host);
                     var handle = ControlTheme.Button(id, () => _session?.ToggleDock(id));
@@ -99,11 +100,9 @@ public partial class SessionPageHost : Grid, IDisposable
                     if (!region.Inputs.TryGetValue(key, out var previous) || previous != value) region.Host.Instance!.WriteParameter(key, value);
                 region.Inputs = dock.Parameters;
             }
-            var context = PageContext();
             void RefreshHost(ViewHost host)
             {
                 host.Instance?.SetPageProperties(context);
-                foreach (var child in host.EmbeddedHosts) RefreshHost(child);
                 host.Refresh();
             }
             RefreshHost(PrimaryHost);
@@ -160,14 +159,14 @@ public partial class SessionPageHost : Grid, IDisposable
     { Canvas.SetLeft(element, box.X); Canvas.SetTop(element, box.Y); element.Width = box.Width; element.Height = box.Height; }
     private void Remove(string id)
     {
-        var region = _regions[id]; region.Host.Dispose();
-        _canvas.Children.Remove(region.Frame); _canvas.Children.Remove(region.Handle); _canvas.Children.Remove(region.Splitter); _regions.Remove(id);
+        var r = _regions[id]; r.Host.Dispose(); _canvas.Children.Remove(r.Frame); _canvas.Children.Remove(r.Handle); _canvas.Children.Remove(r.Splitter); _regions.Remove(id);
     }
     private void Detach()
     {
         if (_session is not null) _session.Changed -= Refresh;
+        _session = null; _runtime = null;
         foreach (var id in _regions.Keys.ToArray()) Remove(id);
-        PrimaryHost.Dispose(); _session = null; _runtime = null;
+        PrimaryHost.Dispose();
     }
     public new void Dispose() => Detach();
 }

@@ -21,6 +21,7 @@ public sealed class AlarmEngine : IDisposable
     private readonly TimeProvider _clock;
     private readonly AuditLog _audit;
     private readonly List<State> _states;
+    private readonly Dictionary<string, State[]> _byTag;
     private readonly Dictionary<Guid, AlarmEvent> _events = [];
     private readonly Queue<AlarmJournalEntry> _journal = [];
     private readonly IDisposable _subscription;
@@ -39,15 +40,18 @@ public sealed class AlarmEngine : IDisposable
         if (retention < 1) throw new ArgumentOutOfRangeException(nameof(retention));
         _tags = tags; _clock = clock ?? TimeProvider.System; _audit = audit ?? new(); _retention = retention;
         _states = definitions.Select(d => new State(new AlarmDefinition { Id = d.Id, Name = d.Name, TagPath = d.TagPath, Mode = d.Mode, Priority = d.Priority, Setpoint = d.Setpoint, Deadband = d.Deadband, ActiveDelaySeconds = d.ActiveDelaySeconds, ClearDelaySeconds = d.ClearDelaySeconds, Enabled = d.Enabled })).ToList();
-        _subscription = tags.Subscribe(_ => Evaluate());
+        _byTag = _states.GroupBy(s => s.Definition.TagPath, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.Ordinal);
+        _subscription = tags.Subscribe(change => { if (_byTag.TryGetValue(change.Path, out var affected)) Evaluate(affected); });
         Evaluate();
     }
-    public void Evaluate()
+    // Timer evaluation still processes every state so delays and shelving expire without writes.
+    public void Evaluate() => Evaluate(_states);
+    private void Evaluate(IReadOnlyList<State> states)
     {
         lock (_gate)
         {
             var now = _clock.GetUtcNow();
-            foreach (var state in _states)
+            foreach (var state in states)
             {
                 var d = state.Definition;
                 if (state.ShelvedUntil is { } expiry && expiry <= now)
@@ -59,11 +63,11 @@ public sealed class AlarmEngine : IDisposable
                 var sample = _tags.Read(d.TagPath);
                 if (!sample.IsGood) { state.PendingSince = null; continue; } // Bad quality never silently clears an alarm.
                 double value;
-                try { value = sample.Value.AsNumber(); } catch (InvalidOperationException) { continue; }
+                try { value = sample.Value.AsNumber(); } catch (InvalidOperationException) { state.PendingSince = null; continue; }
                 var desired = d.Mode switch
                 {
-                    AlarmMode.High => state.Active ? value > d.Setpoint - d.Deadband : value >= d.Setpoint,
-                    AlarmMode.Low => state.Active ? value < d.Setpoint + d.Deadband : value <= d.Setpoint,
+                    AlarmMode.High => state.Active && d.Deadband > 0 ? value > d.Setpoint - d.Deadband : value >= d.Setpoint,
+                    AlarmMode.Low => state.Active && d.Deadband > 0 ? value < d.Setpoint + d.Deadband : value <= d.Setpoint,
                     AlarmMode.Equal => value == d.Setpoint,
                     AlarmMode.NotEqual => value != d.Setpoint,
                     _ => false
@@ -86,8 +90,11 @@ public sealed class AlarmEngine : IDisposable
                 }
             }
             // Unacknowledged events are intentionally retained: never silently discard a pending operator action.
-            var removable = _events.Values.Where(e => !e.Active && e.Acknowledged).OrderBy(e => e.ActiveTime).ToArray();
-            foreach (var ev in removable.Take(Math.Max(0, _events.Count - _retention))) _events.Remove(ev.EventId);
+            if (_events.Count > _retention)
+            {
+                var removable = _events.Values.Where(e => !e.Active && e.Acknowledged).OrderBy(e => e.ActiveTime).Take(_events.Count - _retention).ToArray();
+                foreach (var ev in removable) _events.Remove(ev.EventId);
+            }
         }
     }
     public bool Acknowledge(Guid id, string actor)

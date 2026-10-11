@@ -50,14 +50,14 @@ internal static partial class BrowserServices
                 components[node.Name] = new
                 {
                     bounds = Bounds(element), value = current.Read(node, "value"), text = current.Read(node, "text"),
-                    rows = element is HmiDataTable table ? table.VisibleRows.Take(20).Select(r => new { key = r.Key, cells = r.Cells.ToArray() }).ToArray() : null
+                    rows = element is HmiDataTable table ? table.VisibleRows.Take(20).Select(r => new { key = r.Key, cells = r.Cells.ToArray() }).ToArray() : null,
+                    tree = element is HmiTree tree ? ObserveTree(tree) : null
                 };
             }
-            views.Add(new { id = Identities.GetValue(instance, _ => new()).Id, view = instance.View.Path, parameters = instance.Parameters, components, diagnostics = instance.Diagnostics.ToArray() });
+            views.Add(new { id = Identities.GetValue(instance, _ => new()).Id, view = instance.View.Path, evaluations = instance.EvaluationCount, bindingIndexBuilds = instance.BindingIndexBuildCount, parameters = instance.Parameters, components, diagnostics = instance.Diagnostics.ToArray() });
             foreach (var embedded in current.EmbeddedHosts) Observe(embedded);
         }
         Observe(host);
-        // Observation only: automation still drives native controls through pointer and keyboard input.
         Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.scadaViews=" + JsonSerializer.Serialize(views, ProjectCodec.Options) + "; '';");
 #endif
     }

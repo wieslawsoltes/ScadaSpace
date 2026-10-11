@@ -9,7 +9,7 @@ public enum PropertyChangeOrigin { Binding, Local, Parameter }
 public sealed record PropertyChange(string ComponentId, string Path, QualifiedValue Previous, QualifiedValue Current, PropertyChangeOrigin Origin);
 
 /// <summary>Instance-scoped property graph. Runtime writes never mutate the project definition.</summary>
-public sealed class ViewInstance
+public sealed partial class ViewInstance
 {
     private readonly ITagProvider _tags;
     private readonly ExpressionEngine _expressions;
@@ -29,6 +29,7 @@ public sealed class ViewInstance
     public void SetPageProperties(Scalar properties)
     {
         if (properties.Kind != ScalarKind.Object || !properties.IsValid()) throw new ArgumentException("Page properties must be an object.");
+        if (PageProperties == properties) return;
         PageProperties = properties; Invalidate();
     }
     public ViewDefinition View { get; }
@@ -52,6 +53,7 @@ public sealed class ViewInstance
         try
         {
             Invalidate(); _resolving.Clear(); _diagnostics.Clear();
+            RefreshBindingIndexes(); EvaluationCount++;
             foreach (var node in _nodes.Values)
             {
                 foreach (var property in node.Props.Keys) Read(node, property);
@@ -82,16 +84,6 @@ public sealed class ViewInstance
     private static string Qualify(string property) => property.StartsWith("props.", StringComparison.Ordinal) || property.StartsWith("custom.", StringComparison.Ordinal) || property.StartsWith("style.", StringComparison.Ordinal) ? property : "props." + property;
     private static bool Below(string path, string parent) => path.Length > parent.Length && path.StartsWith(parent, StringComparison.Ordinal) && path[parent.Length] is '.' or '[';
     private static string Tail(string path, int length) => path.Length > length && path[length] == '.' ? path[(length + 1)..] : path[length..];
-    private static (BindingDefinition? Binding, string Path) FindBinding(ComponentNode node, string path)
-    {
-        BindingDefinition? binding = null; var best = "";
-        foreach (var pair in node.Bindings)
-        {
-            var candidate = Qualify(pair.Key);
-            if ((path == candidate || Below(path, candidate)) && candidate.Length > best.Length) { binding = pair.Value; best = candidate; }
-        }
-        return (binding, best);
-    }
     public QualifiedValue Read(ComponentNode node, string property)
     {
         if (!_nodes.TryGetValue(node.Id, out var own) || !ReferenceEquals(own, node)) throw new ArgumentException("Component belongs to another view instance.");
@@ -150,11 +142,11 @@ public sealed class ViewInstance
             _rawValues[key] = sample;
             // Assemble bindings targeting descendants into a single immutable container value.
             if (sample.IsGood)
-                foreach (var nested in node.Bindings.Keys.Select(Qualify).Where(p => Below(p, path)).OrderBy(p => p.Length).ThenBy(p => p, StringComparer.Ordinal))
+                foreach (var nested in Index(node).Descendants(path))
                 {
                     var leaf = Read(node, nested);
                     if (!leaf.IsGood) { sample = sample with { Quality = leaf.Quality }; break; }
-                    sample = sample with { Value = PropertyPath.Parse(Tail(nested, path.Length)).Set(sample.Value, leaf.Value), Revision = Math.Max(sample.Revision, leaf.Revision), Timestamp = sample.Timestamp < leaf.Timestamp ? sample.Timestamp : leaf.Timestamp };
+                    sample = sample with { Value = ParsedPath(Tail(nested, path.Length)).Set(sample.Value, leaf.Value), Revision = Math.Max(sample.Revision, leaf.Revision), Timestamp = sample.Timestamp < leaf.Timestamp ? sample.Timestamp : leaf.Timestamp };
                 }
             return _values[key] = sample;
         }
@@ -178,7 +170,7 @@ public sealed class ViewInstance
         ScalarKind.String => _expressions.Evaluate(template.Text!, resolve),
         _ => template
     };
-    private static QualifiedValue Extract(QualifiedValue parent, string path) => !parent.IsGood ? parent : PropertyPath.Parse(path).TryRead(parent.Value, out var value) ? parent with { Value = value } : parent with { Value = Scalar.Null, Quality = Quality.BadNotFound };
+    private QualifiedValue Extract(QualifiedValue parent, string path) => !parent.IsGood ? parent : ParsedPath(path).TryRead(parent.Value, out var value) ? parent with { Value = value } : parent with { Value = Scalar.Null, Quality = Quality.BadNotFound };
     private static (string Root, string Suffix) Split(string path)
     {
         var split = path.IndexOfAny(['.', '[']);
@@ -246,9 +238,22 @@ public sealed class ViewInstance
     }
     public bool CanWrite(ComponentNode node, string property)
     {
-        var (binding, _) = FindBinding(node, Qualify(property));
-        if (binding?.Kind == BindingKind.Property && binding.Source.StartsWith("page.props.", StringComparison.Ordinal)) return false;
-        return (binding is null || binding.Enabled && binding.Bidirectional && binding.Kind is BindingKind.Tag or BindingKind.Property && binding.Transforms.Count == 0) && Read(node, property).IsGood;
+        if (!_nodes.TryGetValue(node.Id, out var own) || !ReferenceEquals(own, node)) throw new ArgumentException("Component belongs to another view instance.");
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        bool Check(ComponentNode target, string path)
+        {
+            if (visited.Count >= 64 || !visited.Add(target.Id + "." + path) || !Read(target, path).IsGood) return false;
+            var (binding, _) = FindBinding(target, path);
+            if (binding is null) return true;
+            if (!binding.Enabled || !binding.Bidirectional || binding.Transforms.Count != 0) return false;
+            if (binding.Kind == BindingKind.Tag) return true; // The provider still validates write permissions.
+            if (binding.Kind != BindingKind.Property || binding.Source.StartsWith("page.props.", StringComparison.Ordinal)) return false;
+            if (binding.Source.StartsWith("view.params.", StringComparison.Ordinal)) return ResolveReference(binding.Source, target).IsGood;
+            var (source, sourcePath) = ComponentReference(binding.Source, target);
+            return Check(source, sourcePath);
+        }
+        try { return Check(node, Qualify(property)); }
+        catch (ExpressionException) { return false; }
     }
     public WriteResult Write(ComponentNode node, string property, Scalar value, string actor, long? expectedRevision = null)
     {
@@ -274,7 +279,7 @@ public sealed class ViewInstance
             if (!binding.Enabled || !binding.Bidirectional || binding.Kind is not (BindingKind.Tag or BindingKind.Property) || binding.Transforms.Count != 0) return new(WriteStatus.ReadOnly, current, "Binding is not bidirectionally writable.");
             var parent = boundPath == path ? current : Read(node, boundPath);
             if (!parent.IsGood) return new(WriteStatus.Disabled, parent, "Binding source quality is not good.");
-            var updated = boundPath == path ? value : PropertyPath.Parse(Tail(path, boundPath.Length)).Set(parent.Value, value);
+            var updated = boundPath == path ? value : ParsedPath(Tail(path, boundPath.Length)).Set(parent.Value, value);
             WriteResult result;
             if (binding.Kind == BindingKind.Tag) result = _tags.Write(ResolveTagPath(binding.Source), updated, actor, expected ?? parent.Revision);
             else if (binding.Source.StartsWith("page.props.", StringComparison.Ordinal)) return new(WriteStatus.ReadOnly, current, "Page properties are read-only.");
@@ -290,7 +295,7 @@ public sealed class ViewInstance
         var (root, rest) = fields.ContainsKey(property) ? (property, "") : Split(property);
         var rootPath = scope + "." + root; var rootKey = node.Id + "." + rootPath;
         var previous = Literal(node, rootPath);
-        if (rest.Length > 0) value = PropertyPath.Parse(rest).Set(previous.Value, value);
+        if (rest.Length > 0) value = ParsedPath(rest).Set(previous.Value, value);
         var sample = previous.IsGood && value == previous.Value ? previous : QualifiedValue.Good(value, DateTimeOffset.UtcNow, ++_revision);
         _locals[rootKey] = sample;
         return new(WriteStatus.Good, rest.Length == 0 ? sample : Extract(sample, rest));
@@ -300,8 +305,9 @@ public sealed class ViewInstance
         var current = ResolveReference("view.params." + path, View.Root);
         if (expectedRevision.HasValue && current.Revision != expectedRevision) return new(WriteStatus.RevisionConflict, current, "Parameter revision changed.");
         if (!value.IsValid()) return new(WriteStatus.BadType, current, "Invalid parameter value.");
+        if (current.IsGood && current.Value == value) return new(WriteStatus.Good, current);
         var (root, rest) = Parameters.ContainsKey(path) ? (path, "") : Split(path);
-        if (rest.Length > 0) value = PropertyPath.Parse(rest).Set(Parameters.GetValueOrDefault(root), value);
+        if (rest.Length > 0) value = ParsedPath(rest).Set(Parameters.GetValueOrDefault(root), value);
         Parameters[root] = value; _revision++; Invalidate();
         return new(WriteStatus.Good, ResolveReference("view.params." + path, View.Root));
     }

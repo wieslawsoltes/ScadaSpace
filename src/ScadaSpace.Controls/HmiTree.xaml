@@ -1,0 +1,31 @@
+<UserControl x:Class="ScadaSpace.Controls.HmiTree"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:ScadaSpace.Controls">
+  <Grid Background="White" BorderBrush="#CFDADF" BorderThickness="1">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBox x:Name="FilterBox" PlaceholderText="Filter tree…" FontSize="12" MinHeight="28" Padding="6,2" TextChanged="FilterTextChanged" AutomationProperties.Name="Filter tree"/>
+    <local:HmiTreeListView x:Name="RowsList" Grid.Row="1" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="ItemClicked" SelectionChanged="SelectedItemsChanged" Padding="0"
+        ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+      <local:HmiTreeListView.ItemContainerStyle>
+        <Style TargetType="ListViewItem">
+          <Setter Property="Padding" Value="0"/><Setter Property="MinHeight" Value="0"/>
+          <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+      </local:HmiTreeListView.ItemContainerStyle>
+      <local:HmiTreeListView.ItemsPanel><ItemsPanelTemplate><ItemsStackPanel Orientation="Vertical"/></ItemsPanelTemplate></local:HmiTreeListView.ItemsPanel>
+      <local:HmiTreeListView.ItemTemplate>
+        <DataTemplate x:DataType="local:TreeRowViewModel">
+          <Grid Height="{x:Bind Height}" Margin="{x:Bind Indent}" ToolTipService.ToolTip="{x:Bind Label}">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="24"/><ColumnDefinition/></Grid.ColumnDefinitions>
+            <Button Content="{x:Bind Chevron}" Tag="{x:Bind Path}" Click="ToggleClicked" IsTabStop="False" Visibility="{x:Bind ChevronVisibility}"
+                Width="24" Height="24" MinWidth="0" MinHeight="0" Padding="0" Background="Transparent" BorderThickness="0" AutomationProperties.Name="{x:Bind ToggleName}"/>
+            <TextBlock Grid.Column="1" Text="{x:Bind Icon}" Foreground="#536D7A" VerticalAlignment="Center" FontSize="14"/>
+            <TextBlock Grid.Column="2" Text="{x:Bind Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="13" Margin="2,0,6,0"/>
+          </Grid>
+        </DataTemplate>
+      </local:HmiTreeListView.ItemTemplate>
+    </local:HmiTreeListView>
+    <TextBlock x:Name="StatusText" Grid.Row="2" FontSize="10" Padding="6,3" Foreground="#526671" Text="0 items" IsHitTestVisible="False"/>
+  </Grid>
+</UserControl>

@@ -202,7 +202,8 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
         public HashSet<string> Dependencies { get; } = new(StringComparer.Ordinal);
         public Parser(string source) { _lexer = new(source); _token = _lexer.Next(); }
         private void Next() => _token = _lexer.Next();
-        private void Expect(string text) { if (_token.Text != text) throw new ExpressionException($"Expected '{text}'.", _token.Position); Next(); }
+        private bool IsSymbol(string text) => _token.Kind == TokenKind.Symbol && _token.Text == text;
+        private void Expect(string text) { if (!IsSymbol(text)) throw new ExpressionException($"Expected '{text}'.", _token.Position); Next(); }
         public Node Parse()
         {
             var node = ParseExpression(0);
@@ -219,7 +220,7 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
             if (++_depth > 64 || ++_nodes > 1024) throw new ExpressionException("Expression nesting or node limit exceeded.");
             Node left;
             var token = _token; Next();
-            if (token.Text == "(") { left = ParseExpression(0); Expect(")"); }
+            if (token.Kind == TokenKind.Symbol && token.Text == "(") { left = ParseExpression(0); Expect(")"); }
             else if (token.Kind == TokenKind.Symbol && token.Text is "+" or "-" or "!" || token.Kind == TokenKind.Name && token.Text.Equals("not", StringComparison.OrdinalIgnoreCase)) left = new Unary(token.Text.ToLowerInvariant(), ParseExpression(8));
             else if (token.Kind == TokenKind.Number)
             {
@@ -227,12 +228,12 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
                 left = new Literal(Scalar.From(value));
             }
             else if (token.Kind == TokenKind.String) left = new Literal(Scalar.From(token.Text));
-            else if (token.Kind == TokenKind.Name && _token.Text == "(")
+            else if (token.Kind == TokenKind.Name && IsSymbol("("))
             {
                 Next(); var args = new List<Node>();
-                if (_token.Text != ")")
+                if (!IsSymbol(")"))
                 {
-                    while (true) { args.Add(ParseExpression(0)); if (_token.Text != ",") break; Next(); }
+                    while (true) { args.Add(ParseExpression(0)); if (!IsSymbol(",")) break; Next(); }
                 }
                 Expect(")"); var name = token.Text.ToLowerInvariant();
                 var (min, max) = name switch
@@ -255,12 +256,12 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
                 left = new Reference(token.Text);
             }
             else throw new ExpressionException("Expected a value.", token.Position);
-            while (Precedence(_token.Text) >= minimum)
+            while (_token.Kind is TokenKind.Symbol or TokenKind.Name && Precedence(_token.Text) >= minimum)
             {
                 var op = _token.Text.ToLowerInvariant(); var precedence = Precedence(op); Next();
                 left = new Binary(op, left, ParseExpression(precedence + (op == "^" ? 0 : 1)));
             }
-            if (minimum == 0 && _token.Text == "?") { Next(); var yes = ParseExpression(0); Expect(":"); left = new Conditional(left, yes, ParseExpression(0)); }
+            if (minimum == 0 && IsSymbol("?")) { Next(); var yes = ParseExpression(0); Expect(":"); left = new Conditional(left, yes, ParseExpression(0)); }
             _depth--;
             return left;
         }
