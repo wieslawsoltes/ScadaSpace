@@ -94,7 +94,7 @@ public partial class ViewHost : Canvas, IDisposable
                 _refresh.Add(() => { progress.Minimum = Number(node, "minimum"); progress.Maximum = Math.Max(progress.Minimum + 1, Number(node, "maximum", 100)); progress.Value = Number(node, "value"); });
                 element = progress; break;
             case "Button":
-                var button = ControlTheme.Button(Text(node, "text", "Button"), () => Action(node, "onAction"));
+                var button = ControlTheme.Button(Text(node, "text", "Button"), () => { Action(node, "onAction"); Action(node, "onActionPerformed"); });
                 _refresh.Add(() => { button.Content = Text(node, "text", "Button"); button.IsEnabled = Flag(node, "enabled", true); }); element = button; break;
             case "ToggleSwitch":
                 var toggle = new ToggleSwitch { MinWidth = 0, MinHeight = 0, FontSize = 12, OffContent = "", OnContent = "" };
@@ -164,6 +164,10 @@ public partial class ViewHost : Canvas, IDisposable
         AutomationProperties.SetName(element, node.Name);
         element.IsHitTestVisible = !IsEditing;
         if (node.Rotation != 0) { element.RenderTransform = new RotateTransform { Angle = node.Rotation }; element.RenderTransformOrigin = new Point(.5, .5); }
+        // Native events are raised only in runtime mode. Existing onAction remains a legacy button event.
+        if (node.Events.ContainsKey("onClick")) element.Tapped += (_, _) => Action(node, "onClick");
+        if (node.Events.ContainsKey("onDoubleClick")) element.DoubleTapped += (_, _) => Action(node, "onDoubleClick");
+        if (node.Events.ContainsKey("onContextMenu")) element.RightTapped += (_, _) => Action(node, "onContextMenu");
         _elements[node.Id] = element;
         var style = new Dictionary<string, Scalar>(StringComparer.Ordinal);
         foreach (var className in node.StyleClasses) if (Runtime!.Project.Styles.TryGetValue(className, out var values)) foreach (var pair in values) style[pair.Key] = pair.Value;

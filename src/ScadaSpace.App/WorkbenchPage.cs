@@ -85,7 +85,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         };
         Unloaded += (_, _) => { _timer.Stop(); FlushPanelPreferences(); };
     }
-    private void BuildUi() => BuildDesignerUi();
+    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); }
     private void AddMenu(MenuBar menu, string title, params (string Text, Action Action)[] items)
     {
         var group = new MenuBarItem { Title = title, FontSize = 12, MinHeight = 0, Padding = new Thickness(6, 0, 6, 0) };
@@ -175,7 +175,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     private void UpdateButtons()
     {
         if (_document is null) return;
-        UpdateSessionBar();
+        UpdateSessionBar(); UpdateConfigurationCommands();
         ((Button)_commands["page-configuration"]).IsEnabled = !_preview;
         _title.Text = _document.Project.Name + (_document.IsDirty ? " *" : "") + "  —  ScadaSpace";
         ((Button)_commands["undo"]).IsEnabled = !_preview && _document.CanUndo; ((Button)_commands["redo"]).IsEnabled = !_preview && _document.CanRedo;

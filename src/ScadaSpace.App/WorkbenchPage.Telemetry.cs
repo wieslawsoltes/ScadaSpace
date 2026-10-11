@@ -24,6 +24,8 @@ public sealed partial class WorkbenchPage
         controls["palette-search"] = Bounds(_palette.SearchInput);
         foreach (var pair in _palette.Commands) controls["palette-" + pair.Key] = Bounds(pair.Value);
         foreach (var pair in _palette.Items) controls["palette-item-" + pair.Key] = Bounds(pair.Value);
+        foreach (var (key, item) in _surface.ContextMenuItems) controls["context-" + key] = Bounds(item);
+        foreach (var (key, item) in _configurationButtons) controls["configuration-dialog-" + key] = Bounds(item);
         var components = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var node in ActiveHost.Instance?.View.Root.DescendantsAndSelf() ?? Enumerable.Empty<ComponentNode>())
         {
@@ -33,6 +35,8 @@ public sealed partial class WorkbenchPage
         BrowserServices.SetTelemetry(new
         {
             workspace = new { active = _resources.ActiveView, open = _resources.OpenViews, panels = _panels, paletteOpen = _paletteOpen, paletteVisible = _componentPane.Visibility == Visibility.Visible, paletteButtonsCreated = _palette.CreatedButtonCount, paletteVisibleCount = _palette.VisibleComponentCount, tabsCreated = _viewTabs.CreatedTabCount, explorerNodesCreated = _explorerNodesCreated, explorerNodes = _explorerNodes.Count },
+            eventEditor = _eventEditor is null ? null : new { fields = _eventEditor.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), activeEvent = _eventEditor.ActiveEvent, selected = _eventEditor.SelectedAction, count = _eventEditor.ActionCount, error = _eventEditor.ErrorText, dirty = _eventEditor.Draft.IsDirty },
+            configurationExplorer = _configurationExplorer is null ? null : new { fields = _configurationExplorer.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), count = _configurationExplorer.Rows.Count, selected = _configurationExplorer.Selected, builds = _configurationIndex.BuildCount, queries = _configurationIndex.QueryBuildCount },
             page = PageTelemetry(Bounds),
             pageEditor = _pageEditor?.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             ready = true, project = _document.Project.Name, view = _view, preview = _preview, sessionMode = _sessionMode,

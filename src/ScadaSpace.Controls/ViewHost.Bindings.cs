@@ -25,9 +25,9 @@ public partial class ViewHost
     }
     private void Action(ComponentNode node, string eventName)
     {
-        if (IsEditing) return;
+        if (IsEditing || _updating || !node.Events.ContainsKey(eventName)) return;
         try { Session?.Dispatch(node, eventName); ValueChanged?.Invoke(); }
-        catch (InvalidOperationException ex) { Error?.Invoke(ex.Message); }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or FormatException) { Error?.Invoke(ex.Message); }
     }
     private bool Writable(ComponentNode node, string property) => !IsEditing && Flag(node, "enabled", true) && Instance?.CanWrite(node, property) == true;
 }
