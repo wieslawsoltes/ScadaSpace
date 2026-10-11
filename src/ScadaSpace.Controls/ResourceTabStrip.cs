@@ -9,6 +9,8 @@ public sealed partial class ResourceTabStrip : Grid
 {
     private sealed record Tab(Grid Frame,Button Open,TextBlock Label,Button Close);
     private readonly Dictionary<string,Tab> _tabs=new(StringComparer.Ordinal);
+    private readonly Dictionary<string,FrameworkElement> _menuItems=new(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string,FrameworkElement> ContextMenuItems => _menuItems;
     private readonly StackPanel _items=new() {Orientation=Orientation.Horizontal};
     private readonly ScrollViewer _scroll;
     public event Action<string>? OpenRequested;
@@ -27,7 +29,7 @@ public sealed partial class ResourceTabStrip : Grid
     public void Update(IReadOnlyList<string> paths,string? active)
     {
         var keep=paths.ToHashSet(StringComparer.Ordinal);
-        foreach(var path in _tabs.Keys.Where(p=>!keep.Contains(p)).ToArray()) { _items.Children.Remove(_tabs[path].Frame);_tabs.Remove(path); }
+        foreach(var path in _tabs.Keys.Where(p=>!keep.Contains(p)).ToArray()) { _items.Children.Remove(_tabs[path].Frame);_tabs.Remove(path);foreach(var command in new[]{"Close","Close Others","Close All"})_menuItems.Remove(path+":"+command); }
         for(var index=0;index<paths.Count;index++)
         {
             var path=paths[index];
@@ -42,7 +44,7 @@ public sealed partial class ResourceTabStrip : Grid
                 var frame=new Grid {BorderThickness=new Thickness(0,2,1,0)};frame.ColumnDefinitions.Add(new() {Width=GridLength.Auto});frame.ColumnDefinitions.Add(new() {Width=GridLength.Auto});
                 frame.Children.Add(open);Grid.SetColumn(close,1);frame.Children.Add(close);
                 var menu=new MenuFlyout();
-                void Item(string title,Action callback) {var item=new MenuFlyoutItem {Text=title};item.Click+=(_,_)=>callback();menu.Items.Add(item);}
+                void Item(string title,Action callback) {var item=new MenuFlyoutItem {Text=title};item.Click+=(_,_)=>callback();menu.Items.Add(item);_menuItems[path+":"+title]=item;}
                 Item("Close",()=>CloseRequested?.Invoke(path));Item("Close Others",()=>CloseOthersRequested?.Invoke(path));Item("Close All",()=>CloseAllRequested?.Invoke());
                 frame.ContextFlyout=menu;tab=new(frame,open,label,close);_tabs.Add(path,tab);CreatedTabCount++;
             }

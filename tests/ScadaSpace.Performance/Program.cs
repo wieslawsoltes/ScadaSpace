@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using ScadaSpace.Core;
+using ScadaSpace.Designer;
 using ScadaSpace.Data;
 using ScadaSpace.History;
 using ScadaSpace.Runtime;
@@ -73,6 +74,14 @@ var view = new ViewInstance(new() { Root = root }, tags); view.Evaluate();
 var builds = view.BindingIndexBuildCount;
 reports.Add(Measure("binding_evaluation_500_properties", 100, () => { view.Evaluate(); return view.Values.Count; }));
 if (view.BindingIndexBuildCount != builds || view.Read(root, "p499").Value.Number != 2) throw new Exception("Binding evaluation must reuse its index and preserve results.");
+
+var workspace = new DesignerWorkspace();
+workspace.Reset(Enumerable.Range(0, 128).Select(i => "View" + i));
+var openSnapshot = workspace.OpenViews; var workspaceRevision = workspace.Revision;
+var activation = Measure("workspace_already_active_128_resources", 1000, () => { workspace.Open("View0"); return workspace.OpenViews.Count; });
+reports.Add(activation);
+if (!ReferenceEquals(openSnapshot, workspace.OpenViews) || workspace.Revision != workspaceRevision || activation.BytesPerOperation != 0)
+    throw new Exception("Already-active resources must retain their snapshot without allocation.");
 
 Directory.CreateDirectory("TestResults");
 File.WriteAllText("TestResults/performance.json", JsonSerializer.Serialize(new {
