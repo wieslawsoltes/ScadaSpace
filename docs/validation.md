@@ -32,6 +32,14 @@ The original nested-property inspector enhancement was not published after its u
 
 ## Current results
 
-Feature revision `94d855292327b8e4ca0db8534d0816e9b4ae0d18` passed Actions run `38091075163`: 37/37 engine checks, 10/10 hardening checks, 41/41 parity checks, 19/19 baseline browser checks and 16/16 structured-runtime browser checks. Desktop compilation, WebAssembly publication and control packaging also passed. These figures identify an executed feature baseline, not full Perspective compatibility.
+Feature revision `94d855292327b8e4ca0db8534d0816e9b4ae0d18` passed Actions run `38091075163`: 37/37 engine checks, 10/10 hardening checks, 41/41 parity checks, 19/19 baseline browser checks and 16/16 structured-runtime browser checks. Desktop compilation and WebAssembly publication also passed. The initial control-pack command exited successfully without producing an archive; PR #2 subsequently fixed and gated that artifact gap (see [package artifact integrity](package-artifacts.md)). These figures identify an executed feature baseline, not full Perspective compatibility.
 
 The package-consumer gate restores a temporary console application from the generated local NuGet feed without project references and executes four public-API checks. Pages publication includes a build identity that is fetched after deployment and compared with the validated commit. Use the latest run artifacts to verify the final publication revision.
+
+## Page/navigation continuation
+
+The page/navigation branch adds 28 deterministic engine scenarios and 15 JavaScript adapter checks. The browser page suite has 28 checks driven through the actual native Uno controls, plus the existing structured-runtime suite (16) and baseline suite with typeface validation (21). These counts describe the current test definitions; the Actions reports identify which exact revision passed them.
+
+New checks cover page configuration undo/redo, dynamic/static route precedence, parameter/query isolation, shared dock state, modal cover behavior, auto breakpoints, resizing, native browser history, Unicode deep links and reloads, invalid UTF-8, and canonical URL size rejection. Typeface diagnostics verify the family actually decoded by Skia and proportional glyph metrics rather than merely the configured font name.
+
+The additional configurable-popup prototype was not uploaded after a platform block and is not represented as tested or shipped. The published branch preserves the existing simple popup behavior. No physical GPU or native desktop execution qualification is inferred from these tests.

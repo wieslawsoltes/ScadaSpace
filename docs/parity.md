@@ -18,7 +18,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 | Alarms | States, hysteresis, delays, acknowledgement, timed shelving, status/journal tables | No alarm pipelines, email/SMS/voice notifications, remote journal database or full Perspective alarm filtering/actions |
 | History | Bounded memory storage, UTC queries, sample aggregates, CSV export | No SQL historian, store-and-forward, compression tiers, time-weighted interpolation or durable recovery |
 | Events | Declarative write/toggle/navigate/popup/message actions | No Jython or arbitrary scripting, no entire system scripting API |
-| Sessions | Local page navigation, back stack, popups and isolated browser session launch | No shared multi-user Gateway, live server push, full docked views, URL route parameters or session authentication |
+| Sessions | Parameterized routes, separate query context, typed URL construction, bounded back/forward snapshots, hash deep links, shared/local docked views, push/cover/auto modes, resizing, page configuration editor, existing simple popups and isolated session launch | No shared multi-user Gateway, session authentication, full page-property writeability, same-edge multi-dock definitions, CSS/animation parity, or configurable popup-window parity |
 | Graphics | Independent Skia vector drawing integrated through Uno SKCanvasElement | Backend selected by Uno; not a custom WebGPU backend; no measured physical-GPU performance claim |
 | Packaging | Twelve separate engine/data/graphics/Uno library projects; NuGet pack pipeline | Packages are build artifacts, not published to nuget.org |
 | Desktop/browser | Shared Uno application and platform hosts | Browser interactions are tested; a desktop compilation alone does not validate desktop runtime behavior on every OS |
@@ -26,7 +26,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 ## Verification scope
 
-The deterministic suites contain 37 original engine checks, 10 hardening checks and 41 structured-value/binding/table checks. Browser suites drive the actual Uno controls, including regression checks for navigation with prior selection, property writeback, numeric table editing and reactive repeaters. Test results apply only to the exact revision and scenarios in the accompanying Actions artifacts. See [validation](validation.md).
+The deterministic suites contain 37 original engine checks, 10 hardening checks, 41 structured-value/binding/table checks and 28 page-navigation/dock/query checks. Fifteen adapter tests execute the browser history script. Browser suites drive the actual Uno controls, including regression checks for navigation with prior selection, property writeback, table editing, reactive repeaters, page configuration, docked sessions, Unicode reloads and decoded drawing typefaces. Test results apply only to the exact revision and scenarios in the accompanying Actions artifacts. See [validation](validation.md).
 
 ## Public references
 
@@ -36,3 +36,5 @@ The deterministic suites contain 37 original engine checks, 10 hardening checks 
 - Uno Skia rendering: https://platform.uno/docs/articles/features/using-skia-rendering.html
 
 No proprietary implementation or graphical assets from these references are included.
+
+See [page navigation and docked sessions](page-sessions.md) for the shipped behavior and explicit popup/editor boundaries.
