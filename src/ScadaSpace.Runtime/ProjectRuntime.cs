@@ -25,57 +25,6 @@ public sealed class ProjectRuntime : IDisposable
     public void Dispose() { Alarms.Dispose(); History.Dispose(); }
 }
 
-public sealed record SessionMessage(string Type, IReadOnlyDictionary<string, Scalar> Payload);
-public sealed record PopupInstance(string Id, string View, IReadOnlyDictionary<string, Scalar> Parameters);
-
-/// <summary>Local session navigation and declarative event actions. No arbitrary scripting is evaluated.</summary>
-public sealed class RuntimeSession(ProjectRuntime runtime)
-{
-    private readonly Stack<string> _back = new();
-    private readonly Dictionary<string, PopupInstance> _popups = new(StringComparer.Ordinal);
-    public string CurrentPath { get; private set; } = runtime.Project.Pages.FirstOrDefault()?.Path ?? "/";
-    public string Actor { get; set; } = "demo-operator";
-    public IReadOnlyCollection<PopupInstance> Popups => _popups.Values;
-    public event Action? Changed;
-    public event Action<SessionMessage>? Message;
-    public bool Navigate(string path)
-    {
-        if (!runtime.Project.Pages.Any(x => x.Path == path)) return false;
-        if (path != CurrentPath) { _back.Push(CurrentPath); CurrentPath = path; Changed?.Invoke(); }
-        return true;
-    }
-    public bool Back() { if (!_back.TryPop(out var path)) return false; CurrentPath = path; Changed?.Invoke(); return true; }
-    public void Dispatch(ComponentNode node, string eventName)
-    {
-        if (!node.Events.TryGetValue(eventName, out var actions)) return;
-        foreach (var action in actions)
-        {
-            switch (action.Kind)
-            {
-                case ActionKind.WriteTag:
-                    var write = runtime.Tags.Write(action.Target, action.Value, Actor);
-                    if (!write.Success) throw new InvalidOperationException(write.Message);
-                    break;
-                case ActionKind.ToggleTag:
-                    var old = runtime.Tags.Read(action.Target);
-                    var toggle = runtime.Tags.Write(action.Target, Scalar.From(!old.Value.AsBoolean()), Actor, old.Revision);
-                    if (!toggle.Success) throw new InvalidOperationException(toggle.Message);
-                    break;
-                case ActionKind.Navigate:
-                    if (!Navigate(action.Target)) throw new InvalidOperationException("Unknown page route: " + action.Target);
-                    break;
-                case ActionKind.OpenPopup:
-                    if (_popups.Count >= 16 || !runtime.Project.Views.Any(x => x.Path == action.Target)) throw new InvalidOperationException("Unknown popup view or popup limit reached.");
-                    _popups[action.Target] = new(action.Target, action.Target, new Dictionary<string, Scalar>(action.Parameters)); Changed?.Invoke(); break;
-                case ActionKind.ClosePopup: ClosePopup(action.Target); break;
-                case ActionKind.SendMessage: Message?.Invoke(new(action.Target, new Dictionary<string, Scalar>(action.Parameters))); break;
-                default: throw new InvalidOperationException("Unsupported action.");
-            }
-        }
-    }
-    public void ClosePopup(string id) { if (_popups.Remove(id)) Changed?.Invoke(); }
-}
-
 /// <summary>Deterministic demonstration only; no network/device connections are made.</summary>
 public sealed class PlantSimulator(TagStore tags)
 {
