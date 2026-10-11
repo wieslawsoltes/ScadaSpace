@@ -28,6 +28,7 @@ public partial class HmiDataTable
         }
         AutomationProperties.SetHelpText(this, message ?? "");
         _surface.IsHitTestVisible = message is null;
-        _filter.IsEnabled = _commands.IsEnabled = message is null;
+        _filter.IsEnabled = message is null;
+        foreach (var command in _commands.Children.OfType<Control>()) command.IsEnabled = message is null;
     }
 }

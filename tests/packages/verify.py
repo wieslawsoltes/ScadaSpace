@@ -16,6 +16,7 @@ project = f'''<Project Sdk="Microsoft.NET.Sdk">
 source = '''using ScadaSpace.Core;
 using ScadaSpace.Data;
 using ScadaSpace.Runtime;
+using ScadaSpace.History;
 
 void Check(bool ok, string message) { if (!ok) throw new Exception(message); Console.WriteLine("PASS " + message); }
 var original = Scalar.FromJson("[{\\"id\\":\\"a\\",\\"n\\":100},{\\"id\\":\\"b\\",\\"n\\":2}]");
@@ -38,6 +39,13 @@ var state = new DocumentTreeState(tree);
 var pump = tree.Items.First(n => n.Data.Text == path);
 state.Reveal(pump.Path); state.Select([pump.Path]);
 Check(state.Visible().Any(r => r.Item.Key == pump.Key) && state.SelectionData.Items[0].Fields["value"].Text == path, "packaged tree reveals selected context without Uno");
+var levelPath = "[default]Plant/Tank01/Level";
+var queryRequest = new HistoryQueryRequest(levelPath,DateTimeOffset.MinValue,DateTimeOffset.MaxValue);
+var historyResult = runtime.HistoryQueries.Get(queryRequest);
+Check(historyResult.Data.Items.Count == 1 && ReferenceEquals(historyResult,runtime.HistoryQueries.Get(queryRequest)), "packaged historian returns shared immutable query snapshots");
+view.View.Root.Bindings["historyData"] = new BindingDefinition { Kind = BindingKind.TagHistory, Source = """{"path":"[default]Plant/Tank01/Level","start":0,"end":4102444800000}""" };
+view.Evaluate();
+Check(view.Read(view.View.Root,"historyData").Value.Items.Count == 1 && !view.CanWrite(view.View.Root,"historyData"), "packaged runtime executes read-only TagHistory bindings");
 '''
 logs = []
 try:
@@ -56,8 +64,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 6:
-            raise RuntimeError(f"Expected six executed package checks; got {count}")
+        if count != 8:
+            raise RuntimeError(f"Expected eight executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):
