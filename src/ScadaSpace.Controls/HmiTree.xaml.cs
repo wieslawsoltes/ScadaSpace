@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -23,7 +24,10 @@ public sealed record TreeRowViewModel(DocumentTreeRow Row, double Height)
 public sealed partial class HmiTree : UserControl
 {
     private DocumentTreeState _state = new(new(Scalar.Array([])));
-    private List<TreeRowViewModel> _rows = [];
+    private ObservableCollection<TreeRowViewModel> _rows = [];
+    private IReadOnlyList<DocumentTreeRow>? _projection;
+    private double _projectedHeight;
+    private string _filterText = "";
     private bool _sync;
     private double _rowHeight = 28;
     public Func<TreeSelectionRequest, bool>? SelectionRequested { get; set; }
@@ -39,8 +43,19 @@ public sealed partial class HmiTree : UserControl
     public long RebuildCount { get; private set; }
     public string Filter
     {
-        get => FilterBox.Text;
-        set { if (value is null || value.Length > 1024) throw new ArgumentException("Invalid tree filter."); if (FilterBox.Text != value) { _sync = true; try { FilterBox.Text = value; } finally { _sync = false; } Rebuild(); } }
+        get => _filterText;
+        set
+        {
+            if (value is null || value.Length > 1024) throw new ArgumentException("Invalid tree filter.");
+            // Compare with the last committed value, not the editor's in-flight text.
+            // TextChanged is asynchronous; polling must not restore the old model value
+            // between keyboard deletion and its notification.
+            if (_filterText == value) return;
+            _filterText = value;
+            var wasSync = _sync; _sync = true;
+            try { FilterBox.Text = value; } finally { _sync = wasSync; }
+            Rebuild();
+        }
     }
     public bool ShowFilter { get => FilterBox.Visibility == Visibility.Visible; set => FilterBox.Visibility = value ? Visibility.Visible : Visibility.Collapsed; }
     public double RowHeight
@@ -61,7 +76,7 @@ public sealed partial class HmiTree : UserControl
     }
     public HmiTree()
     {
-        InitializeComponent(); RowsList.TreeOwner = this; FilterBox.MaxLength = 1024;
+        InitializeComponent(); RowsList.TreeOwner = this; FilterBox.MaxLength = 1024; RowsList.ItemsSource = _rows;
     }
     public void SetItems(Scalar items)
     {
@@ -83,14 +98,33 @@ public sealed partial class HmiTree : UserControl
     public void ExpandAll(bool expanded) { _state.ExpandAll(expanded); Rebuild(); }
     private void Rebuild()
     {
-        _sync = true;
+        var wasSync = _sync; _sync = true;
         try
         {
-            _rows = _state.Visible(FilterBox.Text).Select(row => new TreeRowViewModel(row, _rowHeight)).ToList();
-            RowsList.ResetPendingFocus(); RowsList.ItemsSource = _rows; SyncSelection(); RebuildCount++;
+            var projection = _state.Visible(_filterText);
+            if (!ReferenceEquals(projection, _projection) || _rowHeight != _projectedHeight)
+            {
+                var old = _rows.ToDictionary(r => r.Row.Item.Key, StringComparer.Ordinal);
+                var next = projection.Select(row => old.TryGetValue(row.Item.Key, out var prior) && prior.Row == row && prior.Height == _rowHeight ? prior : new TreeRowViewModel(row, _rowHeight)).ToArray();
+                var prefix = 0;
+                while (prefix < _rows.Count && prefix < next.Length && ReferenceEquals(_rows[prefix], next[prefix])) prefix++;
+                var suffix = 0;
+                while (suffix < _rows.Count - prefix && suffix < next.Length - prefix && ReferenceEquals(_rows[_rows.Count - 1 - suffix], next[next.Length - 1 - suffix])) suffix++;
+                var remove = _rows.Count - prefix - suffix; var insert = next.Length - prefix - suffix;
+                RowsList.ResetPendingFocus();
+                if (remove + insert <= 64)
+                {
+                    // Small branch edits preserve unrelated native containers and scroll position.
+                    for (var i = 0; i < remove; i++) _rows.RemoveAt(prefix);
+                    for (var i = 0; i < insert; i++) _rows.Insert(prefix + i, next[prefix + i]);
+                }
+                else { _rows = new(next); RowsList.ItemsSource = _rows; }
+                _projection = projection; _projectedHeight = _rowHeight; RebuildCount++;
+            }
+            SyncSelection();
             StatusText.Text = $"{_rows.Count} visible / {_state.Tree.Items.Count} items · {_state.Selected.Count} selected";
         }
-        finally { _sync = false; }
+        finally { _sync = wasSync; }
     }
     private void SyncSelection()
     {
@@ -100,7 +134,10 @@ public sealed partial class HmiTree : UserControl
         else RowsList.SelectedItem = _rows.FirstOrDefault(r => keys.Contains(r.Row.Item.Key));
     }
     private void FilterTextChanged(object sender, TextChangedEventArgs e)
-    { if (!_sync && RowsList is not null) { Rebuild(); FilterChanged?.Invoke(FilterBox.Text); } }
+    {
+        if (_sync || RowsList is null || _filterText == FilterBox.Text) return;
+        _filterText = FilterBox.Text; Rebuild(); FilterChanged?.Invoke(_filterText);
+    }
     private void ToggleClicked(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string path } && IsEnabled) SetExpanded(path, !_state.IsExpanded(_state.Tree.Get(path)));

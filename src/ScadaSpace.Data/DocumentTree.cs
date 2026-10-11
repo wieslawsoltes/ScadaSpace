@@ -21,6 +21,8 @@ public sealed class DocumentTree
     public IReadOnlyList<DocumentTreeItem> Items { get; }
     public IReadOnlyDictionary<string, DocumentTreeItem> ByPath { get; }
     public IReadOnlyDictionary<string, DocumentTreeItem> ByKey { get; }
+    private readonly Dictionary<string, int> _order = new(StringComparer.Ordinal);
+    internal int Ordinal(DocumentTreeItem item) => _order[item.Key];
     public DocumentTree(Scalar source)
     {
         if (!source.IsValid() || source.Kind != ScalarKind.Array) throw new ArgumentException("Tree items must be an array.");
@@ -54,6 +56,7 @@ public sealed class DocumentTree
         Roots = Read(source, null, 0);
         void Walk(IEnumerable<DocumentTreeItem> items) { foreach (var item in items) { ordered.Add(item); Walk(item.Children); } }
         Walk(Roots); Items = ordered.AsReadOnly();
+        for (var i = 0; i < ordered.Count; i++) _order.Add(ordered[i].Key, i);
         ByPath = new ReadOnlyDictionary<string, DocumentTreeItem>(paths); ByKey = new ReadOnlyDictionary<string, DocumentTreeItem>(keys);
     }
     public DocumentTreeItem Get(string path) => ByPath.TryGetValue(path, out var item) ? item : throw new ArgumentException("Unknown tree index path: " + path);
@@ -69,7 +72,13 @@ public sealed class DocumentTreeState
     private string? _current;
     public DocumentTree Tree { get; private set; }
     public DocumentTreeState(DocumentTree tree) => Tree = tree ?? throw new ArgumentNullException(nameof(tree));
-    public IReadOnlyList<DocumentTreeItem> Selected => Tree.Items.Where(n => _selection.Contains(n.Key)).ToArray();
+    private IReadOnlyList<DocumentTreeItem> _selected = Array.Empty<DocumentTreeItem>();
+    private IReadOnlyList<DocumentTreeRow>? _visible;
+    private string? _filter;
+    public IReadOnlyList<DocumentTreeItem> Selected => _selected;
+    public long ProjectionBuildCount { get; private set; }
+    private static IReadOnlyList<DocumentTreeItem> OrderedSelection(DocumentTree tree, IEnumerable<string> keys) =>
+        Array.AsReadOnly(keys.Where(tree.ByKey.ContainsKey).Select(key => tree.ByKey[key]).OrderBy(tree.Ordinal).ToArray());
     public string CurrentPath => _current is not null && Tree.ByKey.TryGetValue(_current, out var item) ? item.Path : "";
     public Scalar SelectionData { get; private set; } = Scalar.Array([]);
     private static Scalar SelectionSnapshot(IEnumerable<DocumentTreeItem> items) => Scalar.Array(items.Select(n => Scalar.Object(new Dictionary<string, Scalar> { ["itemPath"] = n.IndexPath, ["value"] = n.Data })));
@@ -77,25 +86,39 @@ public sealed class DocumentTreeState
     public void Replace(DocumentTree tree)
     {
         ArgumentNullException.ThrowIfNull(tree);
-        var data = SelectionSnapshot(tree.Items.Where(n => _selection.Contains(n.Key)));
+        if (ReferenceEquals(Tree, tree)) return;
+        var selected = OrderedSelection(tree, _selection);
+        var data = SelectionSnapshot(selected);
         foreach (var key in _expansion.Keys.ToArray())
             if (!tree.ByKey.TryGetValue(key, out var item) || !Tree.ByKey.TryGetValue(key, out var old) || old.InitiallyExpanded != item.InitiallyExpanded) _expansion.Remove(key);
         _selection.RemoveWhere(key => !tree.ByKey.ContainsKey(key));
         if (_current is not null && !tree.ByKey.ContainsKey(_current)) _current = tree.Items.FirstOrDefault(n => _selection.Contains(n.Key))?.Key;
-        Tree = tree; SelectionData = data;
+        Tree = tree; _selected = selected; SelectionData = data; _visible = null;
     }
     public void SetExpanded(string path, bool expanded, bool recursive = false)
     {
-        var root = Tree.Get(path);
-        foreach (var item in Tree.Items.Where(n => n.Path == root.Path || recursive && n.Path.StartsWith(root.Path + "/", StringComparison.Ordinal)))
-            if (item.Children.Count > 0) _expansion[item.Key] = expanded;
+        void Apply(DocumentTreeItem item)
+        {
+            if (item.Children.Count > 0)
+            {
+                if (IsExpanded(item) != expanded) _visible = null;
+                _expansion[item.Key] = expanded;
+            }
+            if (recursive) foreach (var child in item.Children) Apply(child);
+        }
+        Apply(Tree.Get(path));
     }
     public void ExpandAll(bool expanded)
-    { foreach (var item in Tree.Items) if (item.Children.Count > 0) _expansion[item.Key] = expanded; }
+    { foreach (var item in Tree.Roots) SetExpanded(item.Path, expanded, true); }
     public void Reveal(string path)
     {
         var item = Tree.Get(path);
-        while (item.ParentPath is { } parent) { item = Tree.Get(parent); _expansion[item.Key] = true; }
+        while (item.ParentPath is { } parent)
+        {
+            item = Tree.Get(parent);
+            if (!IsExpanded(item)) _visible = null;
+            _expansion[item.Key] = true;
+        }
     }
     public void Select(IEnumerable<string> paths, string? current = null)
     {
@@ -109,12 +132,16 @@ public sealed class DocumentTreeState
         var active = current is null ? last : Tree.Get(current);
         if (active is not null && !selected.Contains(active.Key)) throw new ArgumentException("Current tree item must be selected.");
         // Selection output has its own structured-value budget. Validate it before mutating state.
-        var data = SelectionSnapshot(Tree.Items.Where(n => selected.Contains(n.Key)));
-        _selection.Clear(); _selection.UnionWith(selected); _current = active?.Key; SelectionData = data;
+        if (_selection.SetEquals(selected)) { _current = active?.Key; return; }
+        var ordered = OrderedSelection(Tree, selected);
+        var data = SelectionSnapshot(ordered);
+        _selection.Clear(); _selection.UnionWith(selected); _current = active?.Key; _selected = ordered; SelectionData = data;
     }
     public IReadOnlyList<DocumentTreeRow> Visible(string filter = "")
     {
         if (filter is null || filter.Length > 1024) throw new ArgumentException("Tree filter exceeds 1024 characters.");
+        filter = string.IsNullOrWhiteSpace(filter) ? "" : filter;
+        if (_visible is not null && _filter == filter) return _visible;
         var rows = new List<DocumentTreeRow>();
         HashSet<string>? matches = null;
         if (!string.IsNullOrWhiteSpace(filter))
@@ -136,6 +163,6 @@ public sealed class DocumentTreeState
                 rows.Add(new(item, expanded)); if (expanded) Walk(item.Children);
             }
         }
-        Walk(Tree.Roots); return rows.AsReadOnly();
+        Walk(Tree.Roots); _filter = filter; ProjectionBuildCount++; return _visible = rows.AsReadOnly();
     }
 }
