@@ -43,7 +43,7 @@ public partial class ViewHost
                 {
                     var child = new ViewHost();
                     child.Error += message => Error?.Invoke(message); child.ValueChanged += () => ValueChanged?.Invoke();
-                    try { child.Load(Runtime!, path, inputs, IsEditing, Session, _depth + 1, _ancestry); }
+                    try { child.Load(Runtime!, path, inputs, IsEditing, Session, _depth + 1, _ancestry, Instance!.PageProperties); }
                     catch { child.Dispose(); throw; }
                     var box = new Viewbox { Child = child, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Top };
                     Grid.SetColumn(box, i); panel.Children.Add(box); _embedded.Add(child);

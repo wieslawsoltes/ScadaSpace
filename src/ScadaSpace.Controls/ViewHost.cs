@@ -29,11 +29,12 @@ public partial class ViewHost : Canvas, IDisposable
     public event Action? ValueChanged;
     public ViewHost() { Background = ControlTheme.Brush("#F4F7F8"); }
 
-    public void Load(ProjectRuntime runtime, string path, IReadOnlyDictionary<string, Scalar>? parameters = null, bool editing = false, RuntimeSession? session = null, int depth = 0, string ancestry = "")
+    public void Load(ProjectRuntime runtime, string path, IReadOnlyDictionary<string, Scalar>? parameters = null, bool editing = false, RuntimeSession? session = null, int depth = 0, string ancestry = "", Scalar? pageProperties = null)
     {
         Dispose(); Children.Clear(); _elements.Clear();
         if (depth > 12 || ancestry.Split('|').Contains(path, StringComparer.Ordinal)) throw new InvalidOperationException("Recursive embedded view: " + path);
         Runtime = runtime; Session = session ?? new(runtime); Instance = runtime.CreateView(path, parameters); IsEditing = editing;
+        if (pageProperties is { } context) Instance.SetPageProperties(context);
         _depth = depth; _ancestry = ancestry + "|" + path;
         Width = Instance.View.Width; Height = Instance.View.Height;
         var root = BuildNode(Instance.View.Root); root.Width = Width; root.Height = Height;
@@ -51,7 +52,11 @@ public partial class ViewHost : Canvas, IDisposable
                 try { update(); }
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException or JsonException) { Error?.Invoke(ex.Message); }
             }
-            foreach (var host in _embedded) host.Refresh();
+            foreach (var host in _embedded)
+            {
+                host.Instance?.SetPageProperties(Instance.PageProperties);
+                host.Refresh();
+            }
         }
         finally { _updating = false; }
     }

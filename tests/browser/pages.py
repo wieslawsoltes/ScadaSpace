@@ -32,7 +32,10 @@ def button(name, text, x, target, kind="Navigate", parameters=None):
     return node(name, "Button", x, 12, 180, 40, {"text": text}, actions=[{"kind": kind, "target": target, "parameters": {k: scalar(v) for k, v in (parameters or {}).items()}}])
 
 fixture = {"schemaVersion": 1, "name": "Page Navigation Lab", "views": [
-    view("Home", 1000, 620, [node("HomeTitle", "Label", 30, 80, 800, 70, {"text": "PAGE NAVIGATION LAB", "fontSize": 30})]),
+    view("Home", 1000, 620, [node("HomeTitle", "Label", 30, 80, 800, 70, {"text": "PAGE NAVIGATION LAB", "fontSize": 30}), node("NestedHost", "EmbeddedView", 30, 220, 900, 240, {"view": "NestedA"})]),
+    view("NestedA", 900, 240, [node("NestedBHost", "EmbeddedView", 0, 0, 900, 220, {"view": "NestedB"})]),
+    view("NestedB", 900, 220, [node("NestedCHost", "EmbeddedView", 0, 0, 900, 180, {"view": "NestedC"})]),
+    view("NestedC", 900, 180, [node("NestedLeaf", "Label", 0, 0, 900, 100, {"text": "", "fontSize": 24}, "'Page ' + {page.props.path}")]),
     view("Equipment", 1000, 620, [
         node("EquipmentTitle", "Label", 30, 90, 860, 65, {"text": "", "fontSize": 30}, "'Equipment ' + {view.params.equipment}"),
         node("QueryLabel", "Label", 30, 175, 800, 45, {"text": "", "fontSize": 20}, "'Mode: ' + {page.props.urlParams.mode}"),
@@ -99,6 +102,16 @@ with sync_playwright() as p:
         page.wait_for_function("window.scadaApp?.page && window.scadaApp.tick > 2", timeout=120000)
         check("isolated session starts at the root page", app()["sessionMode"] and app()["page"]["url"] == "/")
         check("shared push docks reserve primary view space", app()["page"]["primary"]["x"] == 200 and app()["page"]["primary"]["y"] == 64)
+        observed = page.evaluate("window.scadaViews")
+        check("nested page context reaches every child on its first refresh", [v["view"] for v in observed] == ["Home", "NestedA", "NestedB", "NestedC"] and observed[-1]["components"]["NestedLeaf"]["text"]["value"]["text"] == "Page /" and all(not v["diagnostics"] for v in observed))
+        before_evaluations = {v["id"]: v["evaluations"] for v in observed}
+        before_indexes = {v["id"]: v["bindingIndexBuilds"] for v in observed}
+        tick = app()["tick"]
+        wait("window.scadaApp.tick >= " + str(tick + 4))
+        after_evaluations = page.evaluate("window.scadaViews")
+        increments = [v["evaluations"] - before_evaluations[v["id"]] for v in after_evaluations]
+        check("nested views evaluate once per steady-state refresh regardless of depth", increments[0] > 0 and all(n == increments[0] for n in increments))
+        check("idle browser ticks reuse binding indexes", all(v["bindingIndexBuilds"] == before_indexes[v["id"]] for v in after_evaluations))
         initial = dock("side")["instance"]
         fill(component("LocalCounter", "side")["bounds"], 9); page.keyboard.press("Enter"); page.wait_for_timeout(350)
         press("GoA", "nav"); wait("window.scadaApp.page.url === '/equipment/A?mode=auto'")

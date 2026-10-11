@@ -110,8 +110,11 @@ with sync_playwright() as p:
         fill(tree()['filter'], 'Motor')
         check('filter reveals matching ancestors', [r['label'] for r in sorted(tree()['rows'], key=lambda r: r['bounds']['y'])] == ['Plant','Pump','Motor'])
         fill(tree()['filter'], '')
+        wait("window.scadaViews[0].components.EquipmentTree.tree.filterText === ''")
         check('clearing a filter restores local expansion state', tree()['visibleCount'] == 5)
+        rebuilds = tree()['rebuilds']
         fill(component('SelectionInput')['bounds'], '0/0/0')
+        check('selection-only input does not recreate visible tree rows', tree()['rebuilds'] == rebuilds)
         check('bidirectional external selection input selects the node', tree()['selection'] == '0/0/0' and tree()['selectedPaths'] == ['0/0/0'])
         fill(component('Mode')['bounds'], 'bad')
         check('malformed bound items disable interaction with a visible diagnostic', not tree()['enabled'] and 'objects' in tree()['error'])
