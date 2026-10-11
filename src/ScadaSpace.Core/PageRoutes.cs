@@ -1,9 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text;
 
 namespace ScadaSpace.Core;
 
-public sealed record PageAddress(string Path, string Url, IReadOnlyList<string> Segments, IReadOnlyDictionary<string, Scalar> Query)
+public sealed partial record PageAddress(string Path, string Url, IReadOnlyList<string> Segments, IReadOnlyDictionary<string, Scalar> Query)
 {
     public const int MaximumLength = 4096;
     public static PageAddress Parse(string url)
@@ -31,17 +32,26 @@ public sealed record PageAddress(string Path, string Url, IReadOnlyList<string> 
         }
         var path = "/" + string.Join('/', segments.Select(Uri.EscapeDataString));
         var suffix = string.Join('&', query.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(p.Value.Text!)));
-        return new(path, path + (suffix.Length == 0 ? "" : "?" + suffix), Array.AsReadOnly(segments), new ReadOnlyDictionary<string, Scalar>(query));
+        var canonical = path + (suffix.Length == 0 ? "" : "?" + suffix);
+        if (canonical.Length > MaximumLength) throw new ArgumentException("Canonical page URL exceeds its length limit.");
+        return new(path, canonical, Array.AsReadOnly(segments), new ReadOnlyDictionary<string, Scalar>(query));
     }
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static string Decode(string value, bool query)
     {
-        for (var i = 0; i < value.Length; i++)
-            if (value[i] == '%')
-            {
-                if (i + 2 >= value.Length || !Uri.IsHexDigit(value[i + 1]) || !Uri.IsHexDigit(value[i + 2])) throw new ArgumentException("Malformed URL escape.");
-                i += 2;
-            }
-        return Uri.UnescapeDataString(query ? value.Replace('+', ' ') : value);
+        // Decode bytes once, with strict UTF-8. Uri.UnescapeDataString may retain malformed
+        // UTF-8 escapes, especially in query strings, producing non-round-trippable values.
+        var input = StrictUtf8.GetBytes(query ? value.Replace('+', ' ') : value);
+        var output = new byte[input.Length]; var length = 0;
+        static int Hex(byte b) => b is >= (byte)'0' and <= (byte)'9' ? b - '0' : b is >= (byte)'A' and <= (byte)'F' ? b - 'A' + 10 : b is >= (byte)'a' and <= (byte)'f' ? b - 'a' + 10 : -1;
+        for (var i = 0; i < input.Length; i++)
+        {
+            if (input[i] != '%') { output[length++] = input[i]; continue; }
+            if (i + 2 >= input.Length || Hex(input[i + 1]) < 0 || Hex(input[i + 2]) < 0) throw new ArgumentException("Malformed URL escape.");
+            output[length++] = (byte)(Hex(input[i + 1]) * 16 + Hex(input[i + 2])); i += 2;
+        }
+        try { return StrictUtf8.GetString(output, 0, length); }
+        catch (DecoderFallbackException ex) { throw new ArgumentException("Malformed UTF-8 in page URL.", nameof(value), ex); }
     }
 }
 
