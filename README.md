@@ -70,6 +70,12 @@ Object and array properties are immutable, bounded and structurally comparable. 
 
 Data tables support numeric sorting, filtering, source-row identity, and validated double-click cell editing with revision checks. Embedded views and repeaters react to parameter, path and instance-count changes without recreating unchanged children. See [structured runtime and table APIs](docs/structured-runtime.md) for configuration and limits.
 
+## Page navigation and docked sessions
+
+The **Pages** editor configures routes such as `/equipment/:equipment`, primary views, titles, and shared/local docked views as one undoable transaction. **Session** launches the runtime with browser Back/Forward, a page address bar, and hash-based deep links suitable for GitHub Pages. Docked views support push/cover/automatic behavior, breakpoint switching, toggle handles, resizing, and page-local modality while preserving unchanged shared-view state.
+
+`RuntimeSession.NavigatePage` expands configured routes using typed parameters and separate query fields; `PageAddress.WithQuery` builds immutable, encoded addresses. Unicode URL limits are checked after encoding so accepted pages can be reloaded. See [page/session APIs, configuration and limits](docs/page-sessions.md).
+
 ## Boundaries and security
 
 There is no real device driver, OPC-UA transport, Ignition Gateway protocol, Jython engine, SQL named-query service, enterprise identity provider, redundancy or safety certification. Local simulated actors are audit labels, **not authenticated identities**. Browser storage is readable by scripts on the same origin. Never put credentials or sensitive plant information in the demonstration. Separate browser sessions currently own independent simulation state.

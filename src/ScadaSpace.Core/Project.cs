@@ -6,7 +6,7 @@ namespace ScadaSpace.Core;
 public enum LayoutKind { Coordinate, FlexRow, FlexColumn, Column, Breakpoint, Tab }
 public enum BindingKind { Tag, Property, Expression, ExpressionStructure }
 public enum TransformKind { Expression, Scale, Format, Map }
-public enum ActionKind { WriteTag, ToggleTag, Navigate, OpenPopup, ClosePopup, SendMessage }
+public enum ActionKind { WriteTag, ToggleTag, Navigate, OpenPopup, ClosePopup, SendMessage, OpenDock, CloseDock, ToggleDock, NavigateBack, NavigateForward }
 
 public sealed partial class TransformDefinition
 {
@@ -199,6 +199,7 @@ public static partial class ProjectCodec
         var alarmIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var alarm in project.Alarms)
             if (alarm is null || !alarmIds.Add(alarm.Id) || !paths.Contains(alarm.TagPath) || !double.IsFinite(alarm.Setpoint) || !double.IsFinite(alarm.Deadband) || alarm.Deadband < 0 || !double.IsFinite(alarm.ActiveDelaySeconds) || alarm.ActiveDelaySeconds < 0 || !double.IsFinite(alarm.ClearDelaySeconds) || alarm.ClearDelaySeconds < 0 || !Enum.IsDefined(alarm.Mode) || !Enum.IsDefined(alarm.Priority)) Error("Invalid alarm definition or unknown tag.", "alarms");
+        errors.AddRange(ValidatePages(project));
         return errors;
     }
 }

@@ -48,12 +48,13 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     private double _leftWidth = 235;
     private double _rightWidth = 285;
     private DateTimeOffset _last = DateTimeOffset.UtcNow;
-    public WorkbenchPage()
+    public WorkbenchPage(bool sessionMode = false)
     {
         Background = ControlTheme.Brush("#E7ECEF"); FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Open Sans");
-        _sessionMode = BrowserServices.Query("session") == "1";
+        _sessionMode = sessionMode || BrowserServices.Query("session") == "1";
         _preview = _sessionMode;
         BuildUi();
+        _pageHost.Error += SetStatus; _pageHost.ValueChanged += () => { RefreshTags(); PublishTelemetry(); };
         _surface.SelectionChanged += RefreshInspector;
         _surface.Status += SetStatus; _surface.Host.ValueChanged += () => { RefreshTags(); PublishTelemetry(); };
         _surface.ZoomChanged += () => _zoomText.Text = $"{_surface.Zoom * 100:0}%";
@@ -93,7 +94,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         AddMenu(menu, "File", ("New project…", () => RunDialog(NewProjectAsync)), ("Open project file…", () => RunDialog(ImportAsync)), ("Save project", Save), ("Export project JSON", Export), ("Restore demonstration…", () => RunDialog(RestoreDemoAsync)));
         AddMenu(menu, "Edit", ("Undo", Undo), ("Redo", Redo), ("Cut", Cut), ("Copy", Copy), ("Paste", Paste), ("Duplicate", Duplicate), ("Delete", Delete));
         AddMenu(menu, "View", ("Preview / design", TogglePreview), ("Fit view", () => _surface.Fit()), ("Actual size", () => _surface.Zoom = 1), ("Toggle grid", () => _surface.ShowGrid = !_surface.ShowGrid), ("Reset panel layout", () => { _leftWidth = 235; _rightWidth = 285; UpdateResponsiveLayout(); }));
-        AddMenu(menu, "Project", ("New view…", () => RunDialog(NewViewAsync)), ("Edit project JSON…", () => RunDialog(EditProjectJsonAsync)), ("Validate project", ValidateProject), ("Export tag history CSV", ExportHistory), ("Launch isolated session", LaunchSession));
+        AddMenu(menu, "Project", ("New view…", () => RunDialog(NewViewAsync)), ("Page configuration…", () => RunDialog(EditPagesAsync)), ("Edit project JSON…", () => RunDialog(EditProjectJsonAsync)), ("Validate project", ValidateProject), ("Export tag history CSV", ExportHistory), ("Launch isolated session", LaunchSession));
         AddMenu(menu, "Help", ("About / compatibility", () => RunDialog(AboutAsync)));
         top.Children.Add(menu); _title.HorizontalAlignment = HorizontalAlignment.Right; _title.Margin = new Thickness(8, 0, 12, 0); Grid.SetColumn(_title, 1); top.Children.Add(_title);
         var badge = new Border { Background = ControlTheme.Brush("#DCEBE5"), Margin = new Thickness(0, 4, 7, 4), Padding = new Thickness(7, 0, 7, 0), Child = ControlTheme.Text("SIMULATION", 10, "#3B7364") }; Grid.SetColumn(badge, 2); top.Children.Add(badge); root.Children.Add(top);
@@ -105,6 +106,8 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         AddTool("▶ Preview", TogglePreview, "preview"); AddTool("Fit", () => _surface.Fit(), "fit"); AddTool("−", () => _surface.Zoom /= 1.15, "zoom-out"); _toolbar.Children.Add(_zoomText); AddTool("+", () => _surface.Zoom *= 1.15, "zoom-in"); Separator();
         AddTool("Pause simulation", () => { _simulator.Running = !_simulator.Running; UpdateButtons(); }, "simulation");
         AddTool("Export", Export, "export"); AddTool("Import", () => RunDialog(ImportAsync), "import");
+        AddTool("Pages", () => RunDialog(EditPagesAsync), "page-configuration");
+        AddTool("Session", LaunchSession, "launch-session");
         Grid.SetRow(toolScroll, 1); root.Children.Add(toolScroll);
         _workspace.ColumnDefinitions.Add(new() { Width = new GridLength(_leftWidth) }); _workspace.ColumnDefinitions.Add(new() { Width = new GridLength(4) }); _workspace.ColumnDefinitions.Add(new()); _workspace.ColumnDefinitions.Add(new() { Width = new GridLength(4) }); _workspace.ColumnDefinitions.Add(new() { Width = new GridLength(_rightWidth) });
         _left.RowDefinitions.Add(new() { Height = new GridLength(1.2, GridUnitType.Star) }); _left.RowDefinitions.Add(new() { Height = new GridLength(4) }); _left.RowDefinitions.Add(new());
@@ -114,7 +117,11 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         var tagPane = new DockPane("Tag Browser  ·  [default]", _tags); Grid.SetRow(tagPane, 2); _left.Children.Add(tagPane); _workspace.Children.Add(_left);
         var leftSplit = new DockSplitter(); leftSplit.DragDelta += delta => { _leftWidth = Math.Clamp(_leftWidth + delta, 180, 450); UpdateResponsiveLayout(); }; Grid.SetColumn(leftSplit, 1); _workspace.Children.Add(leftSplit);
         var middle = new Grid(); middle.RowDefinitions.Add(new() { Height = new GridLength(30) }); middle.RowDefinitions.Add(new());
-        var tabs = new ScrollViewer { Content = _viewTabs, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Background = ControlTheme.Brush("#CBD5DC") }; middle.Children.Add(tabs); Grid.SetRow(_surface, 1); middle.Children.Add(_surface); Grid.SetColumn(middle, 2); _workspace.Children.Add(middle);
+        var tabs = new ScrollViewer { Content = _viewTabs, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Background = ControlTheme.Brush("#CBD5DC") };
+        if (_sessionMode) { middle.RowDefinitions[0].Height = new GridLength(38); middle.Children.Add(BuildSessionBar()); } else middle.Children.Add(tabs);
+        Grid.SetRow(_surface, 1); middle.Children.Add(_surface); _surface.Visibility = _sessionMode ? Visibility.Collapsed : Visibility.Visible;
+        Grid.SetRow(_pageHost, 1); middle.Children.Add(_pageHost); _pageHost.Visibility = _sessionMode ? Visibility.Visible : Visibility.Collapsed;
+        Grid.SetColumn(middle, 2); _workspace.Children.Add(middle);
         var rightSplit = new DockSplitter(); rightSplit.DragDelta += delta => { _rightWidth = Math.Clamp(_rightWidth - delta, 220, 500); UpdateResponsiveLayout(); }; Grid.SetColumn(rightSplit, 3); _workspace.Children.Add(rightSplit);
         _right.RowDefinitions.Add(new() { Height = new GridLength(.8, GridUnitType.Star) }); _right.RowDefinitions.Add(new() { Height = new GridLength(4) }); _right.RowDefinitions.Add(new() { Height = new GridLength(1.4, GridUnitType.Star) });
         _right.Children.Add(new DockPane("Perspective-style Components", _palette));
@@ -140,28 +147,41 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     {
         _loading = true;
         if (_document is not null) _document.Changed -= DocumentChanged;
-        _runtime?.Dispose();
+        if (_session is not null) { _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated; }
+        _pageHost.Dispose(); _surface.Dispose(); _runtime?.Dispose();
         _document = new(project); _runtime = new(_document.Project); _simulator = new(_runtime.Tags); _session = new(_runtime);
-        _session.Changed += SessionChanged;
+        if (_sessionMode)
+        {
+            _session.Navigate(BrowserServices.InitialPageUrl(), replace: true);
+            _pageHost.Load(_runtime, _session);
+            if (_session.Current is { } current) { _view = current.Page.View; BrowserServices.PublishPageNavigation(new(current, NavigationKind.Replace), project.Name); }
+        }
+        _session.Changed += SessionChanged; _session.Navigated += PageNavigated;
         _document.Changed += DocumentChanged;
         if (!_document.Project.Views.Any(v => v.Path == _view)) _view = _document.Project.Pages.FirstOrDefault()?.View ?? _document.Project.Views[0].Path;
         BuildExplorer(); BuildTabs(); OpenView(_view); RefreshTags(); _loading = false; UpdateButtons(); PublishTelemetry();
     }
     private void DocumentChanged()
     {
-        _runtime.UpdateViews(_document.Project); BuildExplorer(); BuildTabs();
+        _runtime.UpdateViews(_document.Project);
+        _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated;
+        _session = new(_runtime); _session.Changed += SessionChanged; _session.Navigated += PageNavigated;
+        if (_sessionMode) _pageHost.Load(_runtime, _session);
+        BuildExplorer(); BuildTabs();
         if (!_document.Project.Views.Any(v => v.Path == _view)) _view = _document.Project.Views[0].Path;
         OpenView(_view); UpdateButtons();
     }
     private void OpenView(string path)
     {
         if (_runtime is null) return;
+        if (_sessionMode) { _pageHost.Refresh(); _view = _session.Current?.Page.View ?? path; UpdateButtons(); PublishTelemetry(); return; }
         _view = path; _surface.Load(_document, _runtime, path, _preview, _session); RefreshInspector(); BuildTabs(); UpdateButtons();
         foreach (var button in _viewTabs.Children.OfType<Button>()) button.Background = ControlTheme.Brush((string?)button.Tag == path ? "#F7FAFC" : "#D4DFE6");
     }
     private void BuildTabs()
     {
         _viewTabs.Children.Clear();
+        if (_sessionMode) return;
         var views = _sessionMode ? _document.Project.Pages.Select(p => (p.View, p.Title)).ToArray() : _document.Project.Views.Select(v => (v.Path, v.Path)).ToArray();
         foreach (var (path, title) in views)
         {
@@ -193,7 +213,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     }
     private void RefreshInspector()
     {
-        if (_document is null || _surface.Host.Instance is null) return;
+        if (_sessionMode || _document is null || _surface.Host.Instance is null) return;
         var id = _document.Selection.Count == 1 ? _document.Selection.Single() : null;
         _inspector.Inspect(_document, id, _surface.Host);
         if (_document.Selection.Count > 1) SetStatus(_document.Selection.Count + " components selected");
@@ -210,7 +230,8 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         try
         {
             var now = DateTimeOffset.UtcNow; _simulator.Advance(now - _last); _last = now; _runtime.Alarms.Evaluate();
-            _surface.Host.Refresh(); _inspector.RefreshValues();
+            ReadBrowserNavigation();
+            if (_sessionMode) _pageHost.Refresh(); else { _surface.Host.Refresh(); _inspector.RefreshValues(); }
             if (++_ticks % 4 == 0) { RefreshTags(); UpdateButtons(); }
             var imported = BrowserServices.TakeImport();
             if (imported is not null) { var project = ProjectCodec.Deserialize(imported); InstallProject(project); SetStatus("Imported " + project.Name + " · save to retain this project"); }
@@ -221,6 +242,8 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     private void UpdateButtons()
     {
         if (_document is null) return;
+        UpdateSessionBar();
+        ((Button)_commands["page-configuration"]).IsEnabled = !_preview;
         _title.Text = _document.Project.Name + (_document.IsDirty ? " *" : "") + "  —  ScadaSpace";
         ((Button)_commands["undo"]).IsEnabled = !_preview && _document.CanUndo; ((Button)_commands["redo"]).IsEnabled = !_preview && _document.CanRedo;
         ((Button)_commands["preview"]).Content = _preview ? "■ Design" : "▶ Preview";
@@ -328,13 +351,23 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         BrowserServices.OpenSession();
 #else
         var window = new Window { Title = "ScadaSpace · isolated session" };
-        var page = new WorkbenchPage(); window.Content = page; window.Closed += (_, _) => page.Dispose(); window.Activate();
+        var page = new WorkbenchPage(sessionMode: true); window.Content = page; window.Closed += (_, _) => page.Dispose(); window.Activate();
 #endif
     }
     private void SessionChanged()
     {
-        var page = _runtime.Project.Pages.FirstOrDefault(p => p.Path == _session.CurrentPath);
-        if (page is not null && page.View != _view) OpenView(page.View);
+        var page = _session.Current?.Page;
+        if (_sessionMode) { _pageHost.Refresh(); if (page is not null) _view = page.View; UpdateButtons(); }
+        else if (page is not null)
+        {
+            OpenView(page.View);
+            if (_surface.Host.Instance is { } instance)
+            {
+                foreach (var pair in _session.Current!.Parameters) instance.WriteParameter(pair.Key, pair.Value);
+                instance.SetPageProperties(Scalar.Object(new Dictionary<string, Scalar> { ["path"] = Scalar.From(_session.CurrentPath), ["urlParams"] = Scalar.Object(_session.Current.Address.Query) }));
+                _surface.Host.Refresh();
+            }
+        }
         if (_session.Popups.LastOrDefault() is { } popup && !_dialog) RunDialog(async () =>
         {
             var host = new ViewHost(); host.Load(_runtime, popup.View, popup.Parameters, session: _session);
@@ -371,7 +404,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     public void ReportUnhandled(string message) { _errors.Add(message); while (_errors.Count > 20) _errors.RemoveAt(0); SetStatus(message); PublishTelemetry(); }
     private void PublishTelemetry()
     {
-        if (_document is null || _runtime is null || _surface.Host.Instance is null || ActualWidth <= 0) return;
+        if (_document is null || _runtime is null || ActiveHost.Instance is null || ActualWidth <= 0) return;
         object? Bounds(FrameworkElement element)
         {
             if (!element.IsLoaded || element.ActualWidth <= 0 || element.ActualHeight <= 0) return null;
@@ -380,23 +413,25 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         var controls = _commands.ToDictionary(p => p.Key, p => Bounds(p.Value), StringComparer.Ordinal);
         foreach (var button in _viewTabs.Children.OfType<Button>()) controls["view-" + button.Tag] = Bounds(button);
         var components = new Dictionary<string, object>(StringComparer.Ordinal);
-        foreach (var node in _surface.Host.Instance.View.Root.DescendantsAndSelf())
+        foreach (var node in ActiveHost.Instance.View.Root.DescendantsAndSelf())
         {
-            if (!_surface.Host.Elements.TryGetValue(node.Id, out var element)) continue;
-            components[node.Name] = new { id = node.Id, type = node.Type, x = node.X, y = node.Y, width = node.Width, height = node.Height, bounds = Bounds(element), value = node.Props.ContainsKey("value") || node.Bindings.ContainsKey("value") ? _surface.Host.Read(node, "value") : (QualifiedValue?)null };
+            if (!ActiveHost.Elements.TryGetValue(node.Id, out var element)) continue;
+            components[node.Name] = new { id = node.Id, type = node.Type, x = node.X, y = node.Y, width = node.Width, height = node.Height, bounds = Bounds(element), text = node.Props.ContainsKey("text") || node.Bindings.ContainsKey("text") ? ActiveHost.Read(node, "text") : (QualifiedValue?)null, value = node.Props.ContainsKey("value") || node.Bindings.ContainsKey("value") ? ActiveHost.Read(node, "value") : (QualifiedValue?)null };
         }
         BrowserServices.SetTelemetry(new
         {
+            page = PageTelemetry(Bounds),
+            pageEditor = _pageEditor?.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             ready = true, project = _document.Project.Name, view = _view, preview = _preview, sessionMode = _sessionMode,
             dirty = _document.IsDirty, generation = _document.Generation, canUndo = _document.CanUndo, canRedo = _document.CanRedo,
             zoom = _surface.Zoom, selection = _document.Selection.Select(id => _document.Find(id)?.Name).ToArray(),
             tags = _runtime.Tags.Snapshot(), alarms = _runtime.Alarms.Status(), journalCount = _runtime.Alarms.Journal().Length,
             historyCount = _runtime.History.Query("[default]Plant/Tank01/Level").Length,
-            diagnostics = _surface.Host.Instance.Diagnostics, errors = _errors, status = _status.Text, controls, components,
+            diagnostics = ActiveHost.Instance.Diagnostics, errors = _errors, status = _status.Text, controls, components,
             componentCount = _document.Project.Views.SelectMany(v => v.Root.DescendantsAndSelf()).Count(),
             viewport = new { width = ActualWidth, height = ActualHeight }, tick = _ticks
         });
     }
-    public void Dispose() { _timer.Stop(); _surface.Dispose(); _runtime?.Dispose(); }
+    public new void Dispose() { _timer.Stop(); if (_session is not null) { _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated; } _pageHost.Dispose(); _surface.Dispose(); _runtime?.Dispose(); }
     private sealed record ExplorerItem(string Name, string? View = null, string? ComponentId = null) { public override string ToString() => Name; }
 }

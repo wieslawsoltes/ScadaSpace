@@ -29,6 +29,7 @@ jobs:
           dotnet run --project tests/ScadaSpace.Tests -c Release
           dotnet run --project tests/ScadaSpace.Hardening.Tests -c Release
           dotnet run --project tests/ScadaSpace.Parity.Tests -c Release
+          node --test --test-reporter=tap tests/browser/navigation-adapter.test.cjs > TestResults/navigation-adapter.tap
       - name: Pack reusable engine libraries
         run: |
           for project in src/*/*.csproj; do
@@ -79,6 +80,7 @@ jobs:
           python -m http.server 8765 --bind 127.0.0.1 --directory artifacts/site > artifacts/server.log 2>&1 &
           python tests/browser/smoke.py
           python tests/browser/parity.py
+          python tests/browser/pages.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -86,6 +88,7 @@ jobs:
           path: |
             TestResults/browser
             TestResults/browser-parity
+            TestResults/browser-pages
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()

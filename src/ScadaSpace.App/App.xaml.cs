@@ -9,7 +9,7 @@ namespace ScadaSpace.App;
 
 public partial class App : Application
 {
-    private const string FontAsset = "ms-appx:///Uno.Fonts.Roboto/Fonts/Roboto-Regular.ttf";
+    private const string FontAsset = "ms-appx:///Uno.Fonts.OpenSans/Fonts/OpenSans-Regular.ttf";
     public static Window? MainWindow { get; private set; }
     public App() { InitializeComponent(); RequestedTheme = ApplicationTheme.Light; }
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
@@ -17,16 +17,21 @@ public partial class App : Application
         MainWindow = new Window { Title = "ScadaSpace Designer" };
         MainWindow.Content = new TextBlock { Text = "Loading ScadaSpace…", Margin = new Thickness(24), FontSize = 18 };
         MainWindow.Activate();
+        string? fontError = null;
+        float narrow = 0, wide = 0;
         try
         {
             // Reuse the font shipped by Uno instead of relying on browser/OS font substitution.
             var file = await StorageFile.GetFileFromApplicationUriAsync(new Uri(FontAsset));
             using var stream = await file.OpenStreamForReadAsync();
-            CanvasPainter.DrawingTypeface = SKTypeface.FromStream(stream);
+            CanvasPainter.DrawingTypeface = SKTypeface.FromStream(stream) ?? throw new IOException("The bundled typeface could not be decoded.");
+            using var font = new SKFont(CanvasPainter.DrawingTypeface, 16);
+            narrow = font.MeasureText("iiii"); wide = font.MeasureText("WWWW");
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
-        { System.Diagnostics.Debug.WriteLine("Bundled drawing font could not be loaded: " + ex.Message); }
-        var page = new WorkbenchPage { FontFamily = new FontFamily(FontAsset + "#Roboto") };
+        { fontError = ex.Message; System.Diagnostics.Debug.WriteLine("Bundled drawing font could not be loaded: " + ex.Message); }
+        BrowserServices.SetFontDiagnostics(FontAsset, CanvasPainter.DrawingTypeface?.FamilyName, fontError, narrow, wide);
+        var page = new WorkbenchPage { FontFamily = new FontFamily("ms-appx:///Uno.Fonts.OpenSans/Fonts/OpenSans.ttf") };
         MainWindow.Content = page;
         UnhandledException += (_, e) => page.ReportUnhandled(e.Exception.ToString());
         MainWindow.Closed += (_, _) => page.Dispose();
