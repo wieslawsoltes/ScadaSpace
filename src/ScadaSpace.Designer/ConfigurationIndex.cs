@@ -26,6 +26,10 @@ public sealed class ConfigurationIndex
     {
         ArgumentNullException.ThrowIfNull(document);
         if (ReferenceEquals(document, _document) && document.Generation == _generation) return;
+        Build(document);
+    }
+    private void Build(DesignerDocument document)
+    {
         var entries = new List<ConfigurationReference>();
         foreach (var view in document.Project.Views)
             foreach (var node in view.Root.DescendantsAndSelf())

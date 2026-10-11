@@ -139,12 +139,12 @@ public sealed partial class RuntimeSession
             foreach (var configured in plan)
             {
                 if (!configured.Enabled) continue;
-                ExecuteAction(configured.ToAction());
+                ExecuteAction(configured);
             }
         }
         finally { _dispatching = false; }
     }
-    private void ExecuteAction(EventAction action)
+    private void ExecuteAction(ActionConfiguration action)
     {
         switch (action.Kind)
         {
@@ -157,21 +157,21 @@ public sealed partial class RuntimeSession
                     var toggle = _runtime.Tags.Write(action.Target, Scalar.From(!old.Value.Boolean), Actor, old.Revision);
                     if (!toggle.Success) throw new InvalidOperationException(toggle.Message); break;
                 case ActionKind.Navigate:
-                    if (!Navigate(action.Target, action.Parameters)) throw new InvalidOperationException(LastError); break;
+                    if (!Navigate(action.Target, action.Parameters.Fields)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.NavigateBack: Back(); break;
                 case ActionKind.NavigateForward: Forward(); break;
                 case ActionKind.OpenDock:
-                    if (!OpenDock(action.Target, action.Parameters)) throw new InvalidOperationException(LastError); break;
+                    if (!OpenDock(action.Target, action.Parameters.Fields)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.CloseDock:
                     if (!CloseDock(action.Target)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.ToggleDock:
                     if (!ToggleDock(action.Target)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.OpenPopup:
                     if ((!_popups.ContainsKey(action.Target) && _popups.Count >= 16) || !_runtime.Project.Views.Any(x => x.Path == action.Target)) throw new InvalidOperationException("Unknown popup view or popup limit reached.");
-                    _popups[action.Target] = new(action.Target, action.Target, Snapshot(action.Parameters)); Notify(); break;
+                    _popups[action.Target] = new(action.Target, action.Target, Snapshot(action.Parameters.Fields)); Notify(); break;
                 case ActionKind.ClosePopup: ClosePopup(action.Target); break;
                 case ActionKind.SendMessage:
-                    var message = new SessionMessage(action.Target, Snapshot(action.Parameters));
+                    var message = new SessionMessage(action.Target, Snapshot(action.Parameters.Fields));
                     _notifying = true;
                     try { if (Message is { } handlers) foreach (Action<SessionMessage> observer in handlers.GetInvocationList()) Observe(() => observer(message)); }
                     finally { _notifying = false; }

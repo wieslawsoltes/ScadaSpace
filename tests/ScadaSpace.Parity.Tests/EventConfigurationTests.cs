@@ -47,6 +47,17 @@ internal static class EventConfigurationTests
             var d=new DesignerDocument(p);var draft=new EventConfigurationDraft(d,"button");Assert(draft.EventNames.Contains("customEvent"));Assert(!EventConfigurations.Supported("Button").Contains("customEvent"));
             draft.Add("onActionPerformed",Write(1));draft.Apply(d);Assert(d.Find("button")!.Events.ContainsKey("customEvent"));
         });
+        Add("action validation enforces the complete parameter budget without weakening snapshot bounds", () => {
+            var action=Write(1).ToAction(); var large=Scalar.Array(Enumerable.Repeat(Scalar.From(1),5000));
+            action.Parameters["a"]=large; action.Parameters["b"]=large;
+            Throws<ArgumentException>(()=>ActionConfiguration.Validate(action));
+            Throws<ArgumentException>(()=>ActionConfiguration.From(action));
+            var nested=Scalar.From(1);for(var i=0;i<24;i++)nested=Scalar.Array([nested]);
+            action.Parameters.Clear();action.Parameters["nested"]=nested;
+            Throws<ArgumentException>(()=>ActionConfiguration.Validate(action));
+            action.Parameters.Clear();action.Parameters["valid"]=Scalar.From(3);ActionConfiguration.Validate(action);
+            Equal(3d,ActionConfiguration.From(action).Parameters.Fields["valid"].Number);
+        });
         Add("project validation rejects malformed action tails before deserialization succeeds", () => {
             var p=Project();p.Views[0].Root.Children[0].Events["onClick"]=[Write(1).ToAction(),null!];Assert(ProjectCodec.Validate(p).Count>0);
             Throws<FormatException>(()=>ProjectCodec.Clone(p));
