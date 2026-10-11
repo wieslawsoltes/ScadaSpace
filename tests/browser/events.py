@@ -105,8 +105,11 @@ with sync_playwright() as p:
         total=app()['configurationExplorer']['count'];builds=app()['configurationExplorer']['builds']
         explorer_field('search');page.keyboard.insert_text('ActionButton');wait('window.scadaApp.configurationExplorer.count===3')
         check('Configuration Explorer indexes and filters configured events and actions',total>=7 and app()['configurationExplorer']['selected']['componentName']=='ActionButton')
-        explorer_field('kind');page.keyboard.press('Home');page.keyboard.press('ArrowDown');page.keyboard.press('ArrowDown');page.keyboard.press('ArrowDown');page.keyboard.press('ArrowDown');page.keyboard.press('Enter')
-        wait('window.scadaApp.configurationExplorer.count===2')
+        explorer_field('kind')
+        wait("window.scadaApp.configurationExplorer.kindMenu?.some(item => item.name==='Action' && item.bounds?.width>0)")
+        option = next(item for item in app()['configurationExplorer']['kindMenu'] if item['name']=='Action')
+        click(option['bounds'])
+        wait('window.scadaApp.configurationExplorer.count===2 && window.scadaApp.configurationExplorer.kindMenu===null')
         check('configuration kind filter keeps action references and owned source details',app()['configurationExplorer']['selected']['kind']=='Action' and app()['configurationExplorer']['builds']==builds)
         page.screenshot(path=str(OUT/'configuration-explorer.png'),full_page=True)
         command('configuration-dialog-ok');wait('window.scadaApp.configurationExplorer===null')
@@ -129,9 +132,22 @@ with sync_playwright() as p:
         page.set_viewport_size({'width':1024,'height':768})
         wait("window.scadaApp.viewport.width===1024 && window.scadaApp.viewport.height===768 && window.scadaApp.tick>"+str(previous_tick+2))
         command('fit')
-        wait("window.scadaApp.zoom < .75 && window.scadaApp.components.ActionButton.bounds.x < 250")
+        fitted_layout = """(() => {
+            const a=window.scadaApp, c=a.components.ActionButton, b=c.bounds;
+            return a.zoom<.75 && b?.width>0
+                && Math.abs(b.width-c.width*a.zoom)<1
+                && Math.abs(b.height-c.height*a.zoom)<1;
+        })()"""
+        wait(fitted_layout)
+        fitted_tick = app()['tick']
+        wait(fitted_layout + ' && window.scadaApp.tick>' + str(fitted_tick+1))
+        fitted = app()
+        logs.append({'kind':'tablet-input', 'tick':fitted['tick'], 'zoom':fitted['zoom'], 'bounds':fitted['components']['ActionButton']['bounds']})
+        check('tablet Fit publishes fully scaled native component geometry before input',
+              abs(fitted['components']['ActionButton']['bounds']['width']-250*fitted['zoom'])<1)
         component('ActionButton');value_is(21)
         check('new event actions remain functional at tablet width',process_value()==21 and not app()['errors'])
+        page.screenshot(path=str(OUT/'event-tablet.png'),full_page=True)
         check('all configuration interactions finish without unhandled errors',not app()['errors'] and not app()['diagnostics'] and not any(e['kind']=='pageerror' for e in logs))
     except Exception as error:
         results.append({'name':'event configuration browser run','passed':False,'error':str(error)})

@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using ScadaSpace.Core;
 using Windows.Foundation;
 
@@ -15,6 +16,16 @@ public sealed partial class WorkbenchPage
             for (DependencyObject? parent = element; parent is not null; parent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(parent))
                 if (parent is UIElement { Visibility: Visibility.Collapsed }) return null;
             try { var box = element.TransformToVisual(null).TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight)); return new { x = box.X, y = box.Y, width = box.Width, height = box.Height }; } catch (InvalidOperationException) { return null; }
+        }
+        // Observe realized native menu items only while the popup is open. Browser tests
+        // must wait for this geometry before input; no managed command is exposed here.
+        object? ConfigurationKindMenu()
+        {
+            if (_configurationExplorer?.EditorFields["kind"] is not ComboBox { IsDropDownOpen: true } combo) return null;
+            return ((IEnumerable<string>)combo.ItemsSource).Select((name, index) => new
+            {
+                name, bounds = combo.ContainerFromIndex(index) is FrameworkElement item ? Bounds(item) : null
+            }).ToArray();
         }
         var controls = _commands.ToDictionary(p => p.Key, p => Bounds(p.Value), StringComparer.Ordinal);
         if (_inspector.EventConfigurationButton is { } eventButton) controls["inspector-configure-events"] = Bounds(eventButton);
@@ -37,7 +48,7 @@ public sealed partial class WorkbenchPage
         {
             workspace = new { active = _resources.ActiveView, open = _resources.OpenViews, panels = _panels, paletteOpen = _paletteOpen, paletteVisible = _componentPane.Visibility == Visibility.Visible, paletteButtonsCreated = _palette.CreatedButtonCount, paletteVisibleCount = _palette.VisibleComponentCount, tabsCreated = _viewTabs.CreatedTabCount, explorerNodesCreated = _explorerNodesCreated, explorerNodes = _explorerNodes.Count },
             eventEditor = _eventEditor is null ? null : new { fields = _eventEditor.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), activeEvent = _eventEditor.ActiveEvent, selected = _eventEditor.SelectedAction, count = _eventEditor.ActionCount, error = _eventEditor.ErrorText, dirty = _eventEditor.Draft.IsDirty },
-            configurationExplorer = _configurationExplorer is null ? null : new { fields = _configurationExplorer.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), count = _configurationExplorer.Rows.Count, selected = _configurationExplorer.Selected, builds = _configurationIndex.BuildCount, queries = _configurationIndex.QueryBuildCount },
+            configurationExplorer = _configurationExplorer is null ? null : new { fields = _configurationExplorer.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), count = _configurationExplorer.Rows.Count, selected = _configurationExplorer.Selected, kindMenu = ConfigurationKindMenu(), builds = _configurationIndex.BuildCount, queries = _configurationIndex.QueryBuildCount },
             page = PageTelemetry(Bounds),
             pageEditor = _pageEditor?.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             ready = true, project = _document.Project.Name, view = _view, preview = _preview, sessionMode = _sessionMode,
