@@ -4,7 +4,7 @@ This iteration adds the native three-pane event/action workflow and a searchable
 
 ## Configure Events
 
-Select one component in Design mode and choose **Component → Configure Events…**, or right-click a canvas component and choose **Configure Events…**. The canvas context menu selects the clicked component first and also offers the existing editing commands.
+Select one component in Design mode and choose **Component → Configure Events…**, or right-click a canvas component and choose **Configure Events…**. The canvas context menu selects the clicked component first and also offers the existing editing commands. The Property Editor's **Configure Events…** button opens the same native workflow. A standalone PropertyInspector provides this editor itself; application hosts can coordinate dialogs through its EventsRequested event.
 
 The event list is at the left. The middle list organizes actions; Add, Remove, Move Up/Down and Duplicate operate on that event's ordered list. The right pane edits the action type, target, value type/value, parameters and Enabled option. Target selectors list local tags, configured pages, views or dock IDs as appropriate; typed target input remains available. Numeric values use round-trip formatting rather than display rounding. Structured values and action parameters use bounded native JSON, not executable code.
 
@@ -24,7 +24,7 @@ Local actions are synchronous and ordered. This is deliberately documented rathe
 
 ## Configuration Explorer
 
-**Component → Configuration Explorer** opens a project-wide inventory of bindings, transforms, events, actions, embedded views and repeaters. Filter by kind and text across view/component/location/source. Select a row to inspect its owned source details; **Go To Reference** closes the inventory and selects that component in the designer. This iteration navigates to the component; it does not automatically open every possible specialized editor.
+**Component → Configuration Explorer** opens a project-wide inventory of bindings, transforms, events, actions, embedded views and repeaters. Filter by kind and text across view/component/location/source. Select a row to inspect its owned source details; **Go To Reference** closes the inventory and selects that component in the designer. Event and action references also open the native event editor at the exact handler and action index. These are retained as explicit metadata, not parsed from display paths, so custom event names containing slashes remain unambiguous. Other reference types select the component without opening a specialized editor.
 
 `ConfigurationIndex` rebuilds only when the owning `DesignerDocument` or its generation changes. The index stores immutable reference records rather than mutable component objects. Repeating an unchanged filter reuses the same result collection without traversing the document. The 25,000-entry bound fails explicitly rather than silently omitting configurations. All designer definition mutations must use the document transaction API to participate in generation tracking.
 
@@ -43,3 +43,11 @@ The UI is closer in structure and interaction, not certified pixel-identical. Ar
 References:
 - Perspective Designer Interface: https://www.docs.inductiveautomation.com/docs/8.3/ignition-modules/perspective/perspective-designer-interface
 - Component Events and Actions: https://www.docs.inductiveautomation.com/docs/8.3/ignition-modules/perspective/working-with-perspective-components/component-events-and-actions
+
+## Continuation review
+
+Event drafts now retain their immutable event-name and per-handler snapshots between changes; repeated reads allocate no collection wrappers. Membership changes invalidate only the name inventory, while replacing an action preserves the existing event-name snapshot. Apply uses allocation-conscious configuration validation rather than constructing a snapshot that will be discarded. If a document observer throws after committing an edit, the exception is preserved while the draft records the successful commit, so a repeated Apply is not falsely rejected as stale.
+
+Additional tests cover immutable snapshot identity, handler membership changes, restoring a draft to its original state, exceptions from post-commit observers, and explicit event/action reference metadata. Performance output includes warmed cached event-draft reads as well as the existing configuration inventory, history, tree and workspace scenarios.
+
+The previous browser candidate passed its event editor and runtime interaction checks but timed out on the final viewport-resize interaction. The test now waits for the observed new viewport and its subsequent refreshes before clicking Fit, then requires the newly fitted component geometry before sending pointer input. It retains the tablet event-write assertion. The suite also verifies Property Editor entry and reference-to-action navigation. Executed results apply only to the exact workflow revision; source test definitions alone do not establish success.

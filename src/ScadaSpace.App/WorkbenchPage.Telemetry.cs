@@ -17,6 +17,7 @@ public sealed partial class WorkbenchPage
             try { var box = element.TransformToVisual(null).TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight)); return new { x = box.X, y = box.Y, width = box.Width, height = box.Height }; } catch (InvalidOperationException) { return null; }
         }
         var controls = _commands.ToDictionary(p => p.Key, p => Bounds(p.Value), StringComparer.Ordinal);
+        if (_inspector.EventConfigurationButton is { } eventButton) controls["inspector-configure-events"] = Bounds(eventButton);
         foreach (var pair in _viewTabs.OpenButtons) controls["view-" + pair.Key] = Bounds(pair.Value);
         foreach (var pair in _viewTabs.CloseButtons) controls["close-view-" + pair.Key] = Bounds(pair.Value);
         foreach (var pair in _viewTabs.ContextMenuItems) controls["tab-menu-" + pair.Key] = Bounds(pair.Value);
