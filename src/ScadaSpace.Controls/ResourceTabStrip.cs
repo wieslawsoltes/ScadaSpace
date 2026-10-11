@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -13,15 +14,18 @@ public sealed partial class ResourceTabStrip : Grid
     public IReadOnlyDictionary<string,FrameworkElement> ContextMenuItems => _menuItems;
     private readonly StackPanel _items=new() {Orientation=Orientation.Horizontal};
     private readonly ScrollViewer _scroll;
+    private readonly Dictionary<string,FrameworkElement> _openButtons = new(StringComparer.Ordinal), _closeButtons = new(StringComparer.Ordinal);
+    private readonly ReadOnlyDictionary<string,FrameworkElement> _openSnapshot, _closeSnapshot;
     public event Action<string>? OpenRequested;
     public event Action<string>? CloseRequested;
     public event Action<string>? CloseOthersRequested;
     public event Action? CloseAllRequested;
     public long CreatedTabCount {get;private set;}
-    public IReadOnlyDictionary<string,FrameworkElement> OpenButtons=>_tabs.ToDictionary(p=>p.Key,p=>(FrameworkElement)p.Value.Open,StringComparer.Ordinal);
-    public IReadOnlyDictionary<string,FrameworkElement> CloseButtons=>_tabs.ToDictionary(p=>p.Key,p=>(FrameworkElement)p.Value.Close,StringComparer.Ordinal);
+    public IReadOnlyDictionary<string,FrameworkElement> OpenButtons=>_openSnapshot;
+    public IReadOnlyDictionary<string,FrameworkElement> CloseButtons=>_closeSnapshot;
     public ResourceTabStrip()
     {
+        _openSnapshot=new(_openButtons);_closeSnapshot=new(_closeButtons);
         Background=ControlTheme.Brush("#D5D8DB");
         _scroll=new ScrollViewer {Content=_items,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled};
         Children.Add(_scroll);
@@ -29,7 +33,7 @@ public sealed partial class ResourceTabStrip : Grid
     public void Update(IReadOnlyList<string> paths,string? active)
     {
         var keep=paths.ToHashSet(StringComparer.Ordinal);
-        foreach(var path in _tabs.Keys.Where(p=>!keep.Contains(p)).ToArray()) { _items.Children.Remove(_tabs[path].Frame);_tabs.Remove(path);foreach(var command in new[]{"Close","Close Others","Close All"})_menuItems.Remove(path+":"+command); }
+        foreach(var path in _tabs.Keys.Where(p=>!keep.Contains(p)).ToArray()) { _items.Children.Remove(_tabs[path].Frame);_tabs.Remove(path);_openButtons.Remove(path);_closeButtons.Remove(path);foreach(var command in new[]{"Close","Close Others","Close All"})_menuItems.Remove(path+":"+command); }
         for(var index=0;index<paths.Count;index++)
         {
             var path=paths[index];
@@ -46,7 +50,7 @@ public sealed partial class ResourceTabStrip : Grid
                 var menu=new MenuFlyout();
                 void Item(string title,Action callback) {var item=new MenuFlyoutItem {Text=title};item.Click+=(_,_)=>callback();menu.Items.Add(item);_menuItems[path+":"+title]=item;}
                 Item("Close",()=>CloseRequested?.Invoke(path));Item("Close Others",()=>CloseOthersRequested?.Invoke(path));Item("Close All",()=>CloseAllRequested?.Invoke());
-                frame.ContextFlyout=menu;tab=new(frame,open,label,close);_tabs.Add(path,tab);CreatedTabCount++;
+                frame.ContextFlyout=menu;tab=new(frame,open,label,close);_tabs.Add(path,tab);_openButtons.Add(path,open);_closeButtons.Add(path,close);CreatedTabCount++;
             }
             if(index>=_items.Children.Count || !ReferenceEquals(_items.Children[index],tab.Frame)) { _items.Children.Remove(tab.Frame);_items.Children.Insert(index,tab.Frame); }
             tab.Frame.Background=ControlTheme.Brush(path==active?"#FFFFFF":"#DADDE0");

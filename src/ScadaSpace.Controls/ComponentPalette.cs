@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ScadaSpace.Core;
@@ -16,13 +17,15 @@ public partial class ComponentPalette : Grid
     private readonly List<Group> _groups=[];
     private readonly TextBlock _count=ControlTheme.Text("",10);
     private bool _tiles;
+    private readonly Dictionary<string,FrameworkElement> _itemControls = new(StringComparer.Ordinal);
+    private readonly ReadOnlyDictionary<string,FrameworkElement> _itemSnapshot;
     public event Action<string>? ComponentRequested;
     public event Action<bool>? DisplayModeChanged;
     public int CreatedButtonCount {get;private set;}
     public int VisibleComponentCount {get;private set;}
     public FrameworkElement SearchInput=>_search;
     public Dictionary<string,FrameworkElement> Commands {get;}=new(StringComparer.Ordinal);
-    public IReadOnlyDictionary<string,FrameworkElement> Items=>_groups.SelectMany(g=>g.Entries).ToDictionary(e=>e.Descriptor.Type,e=>(FrameworkElement)e.Button,StringComparer.Ordinal);
+    public IReadOnlyDictionary<string,FrameworkElement> Items=>_itemSnapshot;
     public bool Tiles
     {
         get=>_tiles;
@@ -30,6 +33,7 @@ public partial class ComponentPalette : Grid
     }
     public ComponentPalette()
     {
+        _itemSnapshot = new(_itemControls);
         RowDefinitions.Add(new() {Height=new GridLength(30)});RowDefinitions.Add(new());RowDefinitions.Add(new() {Height=new GridLength(22)});
         var bar=new Grid();bar.ColumnDefinitions.Add(new());bar.ColumnDefinitions.Add(new() {Width=GridLength.Auto});bar.Children.Add(_search);
         var commands=new StackPanel {Orientation=Orientation.Horizontal};Grid.SetColumn(commands,1);bar.Children.Add(commands);Children.Add(bar);
@@ -52,7 +56,7 @@ public partial class ComponentPalette : Grid
                 button.Content=content;button.BorderThickness=new Thickness(0);button.CornerRadius=new CornerRadius(0);button.Background=ControlTheme.Brush("#FFFFFF");button.HorizontalAlignment=HorizontalAlignment.Stretch;button.CanDrag=true;
                 button.DragStarting+=(_,e)=>{e.Data.SetText("scadaspace:"+descriptor.Type);e.Data.RequestedOperation=DataPackageOperation.Copy;};
                 ToolTipService.SetToolTip(button,descriptor.DisplayName+" — click to insert or drag onto the view");
-                group.Entries.Add(new(descriptor,button,content));grid.Children.Add(button);CreatedButtonCount++;
+                group.Entries.Add(new(descriptor,button,content));grid.Children.Add(button);_itemControls.Add(descriptor.Type,button);CreatedButtonCount++;
             }
         }
         _search.TextChanged+=(_,_)=>Filter();Filter();

@@ -11,10 +11,11 @@ out.mkdir(parents=True, exist_ok=True)
 version = "0.1.0"
 project = f'''<Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
-<ItemGroup><PackageReference Include="ScadaSpace.Runtime" Version="{version}" /><PackageReference Include="ScadaSpace.Data" Version="{version}" /></ItemGroup>
+<ItemGroup><PackageReference Include="ScadaSpace.Runtime" Version="{version}" /><PackageReference Include="ScadaSpace.Data" Version="{version}" /><PackageReference Include="ScadaSpace.Designer" Version="{version}" /></ItemGroup>
 </Project>'''
 source = '''using ScadaSpace.Core;
 using ScadaSpace.Data;
+using ScadaSpace.Designer;
 using ScadaSpace.Runtime;
 using ScadaSpace.History;
 
@@ -46,6 +47,16 @@ Check(historyResult.Data.Items.Count == 1 && ReferenceEquals(historyResult,runti
 view.View.Root.Bindings["historyData"] = new BindingDefinition { Kind = BindingKind.TagHistory, Source = """{"path":"[default]Plant/Tank01/Level","start":0,"end":4102444800000}""" };
 view.Evaluate();
 Check(view.Read(view.View.Root,"historyData").Value.Items.Count == 1 && !view.CanWrite(view.View.Root,"historyData"), "packaged runtime executes read-only TagHistory bindings");
+var document = new DesignerDocument(DemoProject.Create());
+var component = document.Project.Views[0].Root;
+var draft = new EventConfigurationDraft(document,component.Id);
+draft.Add("onClick",new ActionConfiguration(ActionKind.WriteTag,"[default]Plant/Tank01/Setpoint",Scalar.From(45),Scalar.Object([])));
+draft.Apply(document);
+Check(document.IsDirty && component.Events["onClick"].Count == 1, "packaged event draft commits a detached component edit");
+var configurations = new ConfigurationIndex(); configurations.Refresh(document);
+var actionRows = configurations.Query("onClick",ConfigurationKind.Action);
+Check(actionRows.Count == 1 && ReferenceEquals(actionRows,configurations.Query("onClick",ConfigurationKind.Action)), "packaged configuration index reuses owned query snapshots");
+
 '''
 logs = []
 try:
@@ -64,8 +75,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 8:
-            raise RuntimeError(f"Expected eight executed package checks; got {count}")
+        if count != 10:
+            raise RuntimeError(f"Expected ten executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):
