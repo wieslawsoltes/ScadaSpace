@@ -68,9 +68,10 @@ with sync_playwright() as p:
         check('hiding Project Browser leaves Tag Browser available', not workspace()['panels']['projectBrowser'] and bounds('project-filter') is None and bounds('tags-pane-close') is not None)
         panel('project')
         check('Panel Chooser restores hidden panels through native menu input', workspace()['panels']['projectBrowser'] and bounds('project-filter') is not None)
+        initial_width=workspace()['panels']['leftWidth']
         grip=bounds('left-splitter'); x=grip['x']+grip['width']/2; y=grip['y']+grip['height']/2
         page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+50,y,steps=8);page.mouse.up()
-        wait('window.scadaApp.workspace.panels.leftWidth>270')
+        wait('Math.abs(window.scadaApp.workspace.panels.leftWidth - '+str(initial_width+50)+') < 1')
         saved_width=workspace()['panels']['leftWidth']; tick=app()['tick']; wait('window.scadaApp.tick>'+str(tick+2))
         check('splitter changes remain workspace-only rather than project edits', not app()['dirty'] and saved_width>270)
         page.reload(wait_until='domcontentloaded'); page.wait_for_function('window.scadaApp?.workspace && window.scadaApp.tick>3',timeout=120000)
