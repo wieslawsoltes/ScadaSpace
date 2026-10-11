@@ -52,6 +52,7 @@ internal static partial class BrowserServices
                     bounds = Bounds(element), value = current.Read(node, "value"), text = current.Read(node, "text"),
                     rows = element is HmiDataTable table ? table.VisibleRows.Take(20).Select(r => new { key = r.Key, cells = r.Cells.ToArray() }).ToArray() : null,
                     tableError = element is HmiDataTable dataTable ? dataTable.DataError : null,
+                    numeric = element is HmiNumericEntry entry ? new { text = entry.InputText, error = entry.InputError, dependencyValue = (double)entry.GetValue(HmiNumericEntry.ValueProperty) } : null,
                     tree = element is HmiTree tree ? ObserveTree(tree) : null
                 };
             }

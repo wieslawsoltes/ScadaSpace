@@ -15,7 +15,7 @@ def scalar(v):
     if isinstance(v, (int, float)): return {'kind': 'Number', 'number': v}
     if isinstance(v, str): return {'kind': 'String', 'text': v}
     if isinstance(v, list): return {'kind': 'Array', 'items': [scalar(x) for x in v]}
-    return {'kind': 'Object', 'fields': {k: scalar(x) for k, x in v.items()}}
+    return {'kind': 'Object', 'fields': {k: scalar(v) for k, v in v.items()}}
 
 def node(name, kind, x, y, w, h, props=None, bindings=None):
     return {'id': name, 'name': name, 'type': kind, 'x': x, 'y': y, 'width': w, 'height': h,
@@ -100,13 +100,15 @@ with sync_playwright() as p:
         fill('Limit',100); wait('window.scadaViews[0].components.RawA.rows.length === 3 && window.scadaViews[0].components.RawA.tableError === null')
         check('valid row limits recover the existing tables',rows('RawA')==rows('RawB') and not view()['diagnostics'])
         fill('Start',4102444800001); wait('window.scadaViews[0].components.RawA.tableError !== null')
-        check('native numeric entry retains large Unix millisecond values without overflow',component('Start')['value']['value']['number']==4102444800001 and not any(x['kind']=='pageerror' for x in logs))
+        check('native numeric entry retains large Unix millisecond values without overflow',component('Start')['value']['value']['number']==4102444800001 and component('Start')['numeric']['text']=='4102444800001' and component('Start')['numeric']['dependencyValue']==4102444800001 and not any(x['kind']=='pageerror' for x in logs))
         check('invalid time ranges leave no previous table measurements visible',rows('RawA')==[] and rows('RawB')==[])
         fill('Start',0); wait('window.scadaViews[0].components.RawA.rows.length === 3')
         fill('Start',2147483648); page.keyboard.press('ArrowUp'); page.wait_for_timeout(250)
         check('numeric keyboard steps preserve values beyond Int32',component('Start')['value']['value']['number']==2147483649)
         fill('Start','NaN')
         check('nonfinite numeric input leaves the previous finite value intact',component('Start')['value']['value']['number']==2147483649 and not any(x['kind']=='pageerror' for x in logs))
+        click(component('Start')['bounds']); page.keyboard.press('Control+a'); page.keyboard.insert_text('12'); page.keyboard.press('Escape'); page.wait_for_timeout(250)
+        check('numeric Escape restores canonical text without committing a draft',component('Start')['numeric']['text']=='2147483649' and component('Start')['numeric']['dependencyValue']==2147483649)
         fill('Start',0); wait('window.scadaViews[0].components.RawA.rows.length === 3')
         check('correcting time input restores the full result',component('RawA')['tableError'] is None and not view()['diagnostics'])
         press('BadColumns'); wait('window.scadaViews[0].components.RawA.tableError !== null')

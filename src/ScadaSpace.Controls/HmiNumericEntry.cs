@@ -21,13 +21,14 @@ public sealed partial class HmiNumericEntry : UserControl
     public event EventHandler<NumericValueChangedEventArgs>? ValueChanged;
     public bool HasEditFocus => _input.FocusState != FocusState.Unfocused;
     public string? InputError { get; private set; }
+    public string InputText => _input.Text;
     public double Value
     {
         get => _value;
         set
         {
             if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value));
-            SetValue(Math.Clamp(value, _minimum, _maximum));
+            SetNumericValue(Math.Clamp(value, _minimum, _maximum));
         }
     }
     public double Minimum
@@ -37,7 +38,7 @@ public sealed partial class HmiNumericEntry : UserControl
         {
             if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value));
             _minimum = value; if (_maximum < value) _maximum = value;
-            SetValue(Math.Clamp(_value, _minimum, _maximum)); UpdateButtons();
+            SetNumericValue(Math.Clamp(_value, _minimum, _maximum)); UpdateButtons(); SynchronizeProperties();
         }
     }
     public double Maximum
@@ -47,13 +48,13 @@ public sealed partial class HmiNumericEntry : UserControl
         {
             if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value));
             _maximum = value; if (_minimum > value) _minimum = value;
-            SetValue(Math.Clamp(_value, _minimum, _maximum)); UpdateButtons();
+            SetNumericValue(Math.Clamp(_value, _minimum, _maximum)); UpdateButtons(); SynchronizeProperties();
         }
     }
     public double SmallChange
     {
         get => _smallChange;
-        set { if (!double.IsFinite(value) || value <= 0) throw new ArgumentOutOfRangeException(nameof(value)); _smallChange = value; }
+        set { if (!double.IsFinite(value) || value <= 0) throw new ArgumentOutOfRangeException(nameof(value)); _smallChange = value; SynchronizeProperties(); }
     }
     public HmiNumericEntry()
     {
@@ -88,10 +89,10 @@ public sealed partial class HmiNumericEntry : UserControl
         };
         UpdateButtons();
     }
-    private void SetValue(double value)
+    private void SetNumericValue(double value)
     {
         var old = _value;
-        _value = value; UpdateButtons();
+        _value = value; UpdateButtons(); SynchronizeProperties();
         if (old == value) return;
         RestoreText(); SetError(null); ValueChanged?.Invoke(this, new(old, value));
     }
@@ -99,7 +100,7 @@ public sealed partial class HmiNumericEntry : UserControl
     {
         var parsed = NumericInputText.ParseDouble(_input.Text);
         if (parsed is null) { RestoreText(); SetError("Enter a finite number using a decimal point."); return false; }
-        SetValue(Math.Clamp(parsed.Value, _minimum, _maximum)); RestoreText(); SetError(null); return true;
+        SetNumericValue(Math.Clamp(parsed.Value, _minimum, _maximum)); RestoreText(); SetError(null); return true;
     }
     private void Step(int direction, int multiplier)
     {
@@ -107,7 +108,7 @@ public sealed partial class HmiNumericEntry : UserControl
         var change = _smallChange * multiplier;
         var candidate = _value + direction * change;
         if (!double.IsFinite(candidate)) candidate = direction > 0 ? _maximum : _minimum;
-        SetValue(Math.Clamp(candidate, _minimum, _maximum)); RestoreText(); _input.Select(_input.Text.Length, 0);
+        SetNumericValue(Math.Clamp(candidate, _minimum, _maximum)); RestoreText(); _input.Select(_input.Text.Length, 0);
     }
     private void RestoreText()
     {
