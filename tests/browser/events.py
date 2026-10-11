@@ -132,9 +132,22 @@ with sync_playwright() as p:
         page.set_viewport_size({'width':1024,'height':768})
         wait("window.scadaApp.viewport.width===1024 && window.scadaApp.viewport.height===768 && window.scadaApp.tick>"+str(previous_tick+2))
         command('fit')
-        wait("window.scadaApp.zoom < .75 && window.scadaApp.components.ActionButton.bounds.x < 250")
+        fitted_layout = """(() => {
+            const a=window.scadaApp, c=a.components.ActionButton, b=c.bounds;
+            return a.zoom<.75 && b?.width>0
+                && Math.abs(b.width-c.width*a.zoom)<1
+                && Math.abs(b.height-c.height*a.zoom)<1;
+        })()"""
+        wait(fitted_layout)
+        fitted_tick = app()['tick']
+        wait(fitted_layout + ' && window.scadaApp.tick>' + str(fitted_tick+1))
+        fitted = app()
+        logs.append({'kind':'tablet-input', 'tick':fitted['tick'], 'zoom':fitted['zoom'], 'bounds':fitted['components']['ActionButton']['bounds']})
+        check('tablet Fit publishes fully scaled native component geometry before input',
+              abs(fitted['components']['ActionButton']['bounds']['width']-250*fitted['zoom'])<1)
         component('ActionButton');value_is(21)
         check('new event actions remain functional at tablet width',process_value()==21 and not app()['errors'])
+        page.screenshot(path=str(OUT/'event-tablet.png'),full_page=True)
         check('all configuration interactions finish without unhandled errors',not app()['errors'] and not app()['diagnostics'] and not any(e['kind']=='pageerror' for e in logs))
     except Exception as error:
         results.append({'name':'event configuration browser run','passed':False,'error':str(error)})
