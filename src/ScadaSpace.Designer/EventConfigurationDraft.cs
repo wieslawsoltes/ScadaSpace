@@ -6,24 +6,25 @@ namespace ScadaSpace.Designer;
 public sealed class EventConfigurationDraft
 {
     private readonly DesignerDocument _document;
-    private readonly Dictionary<string, List<ActionConfiguration>> _events = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<ActionConfiguration>> _events = new(StringComparer.Ordinal);
     private long _generation;
+    private IReadOnlyList<string>? _eventNames;
     public string ComponentId { get; }
     public string ComponentName { get; }
     public string ComponentType { get; }
     public long Revision { get; private set; }
     public bool IsDirty { get; private set; }
-    public IReadOnlyList<string> EventNames => Array.AsReadOnly(EventConfigurations.Supported(ComponentType).Concat(_events.Keys).Distinct(StringComparer.Ordinal).ToArray());
+    public IReadOnlyList<string> EventNames => _eventNames ??= Array.AsReadOnly(EventConfigurations.Supported(ComponentType).Concat(_events.Keys).Distinct(StringComparer.Ordinal).ToArray());
 
     public EventConfigurationDraft(DesignerDocument document, string id)
     {
         _document = document ?? throw new ArgumentNullException(nameof(document));
         var component = document.Find(id) ?? throw new ArgumentException("Unknown component.");
         ComponentId = id; ComponentName = component.Name; ComponentType = component.Type; _generation = document.Generation;
-        foreach (var (name, actions) in EventConfigurations.Snapshot(component.Events)) _events.Add(name, actions.ToList());
+        foreach (var (name, actions) in EventConfigurations.Snapshot(component.Events)) _events.Add(name, actions);
     }
 
-    public IReadOnlyList<ActionConfiguration> Actions(string name) => _events.TryGetValue(name, out var list) ? list.AsReadOnly() : Array.Empty<ActionConfiguration>();
+    public IReadOnlyList<ActionConfiguration> Actions(string name) => _events.TryGetValue(name, out var list) ? list : Array.Empty<ActionConfiguration>();
 
     public void SetActions(string name, IEnumerable<ActionConfiguration> actions)
     {
@@ -33,7 +34,9 @@ public sealed class EventConfigurationDraft
         foreach (var action in next) { ArgumentNullException.ThrowIfNull(action); _ = action.ToAction(); }
         if (Actions(name).SequenceEqual(next)) return;
         if (!_events.ContainsKey(name) && _events.Count >= EventConfigurations.MaximumHandlers) throw new ArgumentException("Too many configured events.");
-        if (next.Count == 0) _events.Remove(name); else _events[name] = next;
+        var membershipChanged = next.Count == 0 || !_events.ContainsKey(name);
+        if (next.Count == 0) _events.Remove(name); else _events[name] = next.AsReadOnly();
+        if (membershipChanged) _eventNames = null;
         Revision++; IsDirty = true;
     }
 
@@ -60,9 +63,20 @@ public sealed class EventConfigurationDraft
         if (!ReferenceEquals(document, _document) || document.Generation != _generation) throw new InvalidOperationException("The project changed while this editor was open. Reopen it before applying.");
         if (!IsDirty) return false;
         var events = _events.ToDictionary(p => p.Key, p => p.Value.Select(a => a.ToAction()).ToList(), StringComparer.Ordinal);
-        _ = EventConfigurations.Snapshot(events);
+        EventConfigurations.Validate(events);
         var before = document.Generation;
-        document.Execute("Configure component events", _ => (document.Find(ComponentId) ?? throw new InvalidOperationException("Component was removed.")).Events = events);
-        _generation = document.Generation; IsDirty = false; return document.Generation != before;
+        try
+        {
+            document.Execute("Configure component events", _ => (document.Find(ComponentId) ?? throw new InvalidOperationException("Component was removed.")).Events = events);
+            _generation = document.Generation; IsDirty = false;
+        }
+        finally
+        {
+            // Changed observers run after commit. Do not leave this editor stale when
+            // an observer throws after a successful commit, or swallow that exception.
+            if (document.Generation == before + 1 && ReferenceEquals(document.Find(ComponentId)?.Events, events))
+            { _generation = document.Generation; IsDirty = false; }
+        }
+        return document.Generation != before;
     }
 }

@@ -97,6 +97,14 @@ reports.Add(cachedConfiguration);
 if (configurationIndex.BuildCount != 1 || configurationIndex.QueryBuildCount != 1 || cachedConfiguration.BytesPerOperation != 0)
     throw new Exception("Idle configuration lookup must retain its inventory and query without allocation.");
 
+var eventDraft = new EventConfigurationDraft(configurationDocument, configurationDocument.Project.Views[0].Root.Id);
+eventDraft.Add("onClick", new(ActionKind.WriteTag, "[default]Plant/Tank01/Setpoint", Scalar.From(45), Scalar.Object([])));
+var eventNames = eventDraft.EventNames; var eventActions = eventDraft.Actions("onClick");
+var draftLookup = Measure("event_draft_cached_snapshots", 1000, () => eventDraft.EventNames.Count + eventDraft.Actions("onClick").Count);
+reports.Add(draftLookup);
+if (draftLookup.BytesPerOperation != 0 || !ReferenceEquals(eventNames, eventDraft.EventNames) || !ReferenceEquals(eventActions, eventDraft.Actions("onClick")))
+    throw new Exception("Idle event editor reads must not allocate wrappers or rebuild supported event names.");
+
 Directory.CreateDirectory("TestResults");
 File.WriteAllText("TestResults/performance.json", JsonSerializer.Serialize(new {
     runtime = RuntimeInformation.FrameworkDescription, os = RuntimeInformation.OSDescription,

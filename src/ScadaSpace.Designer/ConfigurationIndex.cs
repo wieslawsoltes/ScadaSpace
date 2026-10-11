@@ -3,7 +3,7 @@ using ScadaSpace.Core;
 namespace ScadaSpace.Designer;
 
 public enum ConfigurationKind { Binding, Transform, Event, Action, EmbeddedView }
-public sealed record ConfigurationReference(string View, string ComponentId, string ComponentName, string Location, ConfigurationKind Kind, string Source)
+public sealed record ConfigurationReference(string View, string ComponentId, string ComponentName, string Location, ConfigurationKind Kind, string Source, string? EventName = null, int? ActionIndex = null)
 {
     public override string ToString() => $"{View} / {ComponentName}    {Kind} · {Location}";
 }
@@ -34,10 +34,10 @@ public sealed class ConfigurationIndex
         foreach (var view in document.Project.Views)
             foreach (var node in view.Root.DescendantsAndSelf())
             {
-                void Add(ConfigurationKind kind, string location, string source)
+                void Add(ConfigurationKind kind, string location, string source, string? eventName = null, int? actionIndex = null)
                 {
                     if (entries.Count >= MaximumEntries) throw new InvalidOperationException("Configuration inventory exceeds 25,000 entries.");
-                    entries.Add(new(view.Path, node.Id, node.Name, location, kind, source));
+                    entries.Add(new(view.Path, node.Id, node.Name, location, kind, source, eventName, actionIndex));
                 }
                 foreach (var (path, binding) in node.Bindings)
                 {
@@ -50,8 +50,8 @@ public sealed class ConfigurationIndex
                 }
                 foreach (var (name, actions) in node.Events)
                 {
-                    Add(ConfigurationKind.Event, name, $"{actions.Count} actions · {(EventConfigurations.Supported(node.Type).Contains(name) ? "Host event" : "Custom/unwired event")}");
-                    for (var i = 0; i < actions.Count; i++) Add(ConfigurationKind.Action, name + "/action/" + i, System.Text.Json.JsonSerializer.Serialize(actions[i], ProjectCodec.Options));
+                    Add(ConfigurationKind.Event, name, $"{actions.Count} actions · {(EventConfigurations.Supported(node.Type).Contains(name) ? "Host event" : "Custom/unwired event")}", name);
+                    for (var i = 0; i < actions.Count; i++) Add(ConfigurationKind.Action, name + "/action/" + i, System.Text.Json.JsonSerializer.Serialize(actions[i], ProjectCodec.Options), name, i);
                 }
                 if (node.Type is "EmbeddedView" or "FlexRepeater") Add(ConfigurationKind.EmbeddedView, "view", node.Text("view"));
             }
