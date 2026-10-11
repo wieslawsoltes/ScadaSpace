@@ -36,6 +36,8 @@ public partial class ViewHost
                 tree.SetItems(items); tree.Filter = Text(node, "filter");
                 tree.FilterInput.IsReadOnly = IsEditing || !Instance!.CanWrite(node, "filter");
                 var paths = Value(node, "selectedPaths", Scalar.Array([])); var selection = Value(node, "selection", Scalar.From(""));
+                if (selection.Kind != ScalarKind.String || paths.Kind != ScalarKind.Array || paths.Items.Any(v => v.Kind != ScalarKind.String))
+                    throw new FormatException("Selection requires a string and selectedPaths requires an array of strings.");
                 if (paths != previousPaths || selection != previousSelection)
                 {
                     var requested = paths != previousPaths && paths.Kind == ScalarKind.Array && paths.Items.Count > 0
@@ -43,7 +45,6 @@ public partial class ViewHost
                         : selection.Kind == ScalarKind.String && selection.Text!.Length > 0 ? [selection.Text!] : Array.Empty<string>();
                     tree.SelectPaths(requested); previousPaths = paths; previousSelection = selection;
                 }
-                // Reconcile primary/path/context outputs after ID-preserving reorder, pruning or external selection.
                 if (!IsEditing)
                 {
                     var actualPaths = Scalar.Array(tree.SelectedPaths.Select(Scalar.From));

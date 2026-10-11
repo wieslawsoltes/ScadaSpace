@@ -87,7 +87,7 @@ public sealed partial class HmiTree : UserControl
         try
         {
             _rows = _state.Visible(FilterBox.Text).Select(row => new TreeRowViewModel(row, _rowHeight)).ToList();
-            RowsList.ItemsSource = _rows; SyncSelection(); RebuildCount++;
+            RowsList.ResetPendingFocus(); RowsList.ItemsSource = _rows; SyncSelection(); RebuildCount++;
             StatusText.Text = $"{_rows.Count} visible / {_state.Tree.Items.Count} items · {_state.Selected.Count} selected";
         }
         finally { _sync = false; }
@@ -126,7 +126,12 @@ public sealed partial class HmiTree : UserControl
     }
     internal bool HandleTreeKey(KeyRoutedEventArgs e)
     {
-        if (!IsEnabled || _rows.Count == 0 || e.Key is not (VirtualKey.Left or VirtualKey.Right)) return false;
+        if (!IsEnabled || _rows.Count == 0 || e.Key is not (VirtualKey.Left or VirtualKey.Right or VirtualKey.Home or VirtualKey.End)) return false;
+        if (e.Key is VirtualKey.Home or VirtualKey.End)
+        {
+            var endpoint = e.Key == VirtualKey.Home ? _rows[0] : _rows[^1];
+            RowsList.SelectedItem = endpoint; RowsList.FocusRow(endpoint); return true;
+        }
         var row = RowsList.FocusedItem?.Row ?? _rows.FirstOrDefault(r => r.Path == _state.CurrentPath) ?? _rows[0];
         var item = row.Row.Item; string? select = null;
         if (e.Key == VirtualKey.Right)
@@ -139,7 +144,7 @@ public sealed partial class HmiTree : UserControl
         var focusPath = select ?? item.Path;
         if (select is not null) RowsList.SelectedItem = _rows.FirstOrDefault(r => r.Path == select);
         var target = _rows.FirstOrDefault(r => r.Path == focusPath);
-        if (target is not null) { RowsList.ScrollIntoView(target); DispatcherQueue.TryEnqueue(() => (RowsList.ContainerFromItem(target) as Control)?.Focus(FocusState.Keyboard)); }
+        if (target is not null) RowsList.FocusRow(target);
         return true;
     }
 }

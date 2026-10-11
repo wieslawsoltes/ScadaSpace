@@ -11,6 +11,7 @@ namespace ScadaSpace.Controls;
 public sealed partial class HmiTreeListView : ListView
 {
     private readonly HashSet<HmiTreeListItem> _containers = [];
+    private string? _pendingFocusKey;
     internal HmiTree? TreeOwner { get; set; }
     public IReadOnlyList<HmiTreeListItem> RealizedRows => _containers.Where(c => c.IsLoaded && c.Row is not null).ToArray();
     internal HmiTreeListItem? FocusedItem
@@ -22,7 +23,24 @@ public sealed partial class HmiTreeListView : ListView
             return null;
         }
     }
-    protected override DependencyObject GetContainerForItemOverride() => new HmiTreeListItem { Tree = this };
+    internal void ResetPendingFocus() => _pendingFocusKey = null;
+    internal void FocusRow(TreeRowViewModel row)
+    {
+        _pendingFocusKey = row.Row.Item.Key;
+        ScrollIntoView(row); DispatcherQueue.TryEnqueue(TryPendingFocus);
+    }
+    private void TryPendingFocus()
+    {
+        if (_pendingFocusKey is not { } key) return;
+        var container = _containers.FirstOrDefault(c => c.IsLoaded && c.Row?.Row.Item.Key == key);
+        if (container?.Focus(FocusState.Keyboard) == true) _pendingFocusKey = null;
+    }
+    protected override DependencyObject GetContainerForItemOverride()
+    {
+        var container = new HmiTreeListItem { Tree = this };
+        container.Loaded += (_, _) => TryPendingFocus();
+        return container;
+    }
     protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
     {
         base.PrepareContainerForItemOverride(element, item);
@@ -37,6 +55,7 @@ public sealed partial class HmiTreeListView : ListView
             AutomationProperties.SetAutomationId(container, "tree-row-" + row.Path.Replace('/', '-'));
             AutomationProperties.SetLevel(container, row.Row.Item.Depth + 1);
             AutomationProperties.SetPositionInSet(container, row.Row.Item.Index + 1);
+            if (_pendingFocusKey is not null) DispatcherQueue.TryEnqueue(TryPendingFocus);
         }
     }
     protected override void ClearContainerForItemOverride(DependencyObject element, object item)

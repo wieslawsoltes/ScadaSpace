@@ -32,7 +32,7 @@ small = node('EquipmentTree', 'Tree', 20, 80, 440, 310, props(items, multiSelect
     'items': bind("if({[default]Mode} == 'bad', {root.custom.bad}, if({[default]Mode} == 'reordered', {root.custom.reordered}, if({[default]Mode} == 'empty', {root.custom.empty}, {root.custom.items})))", 'Expression'),
     'selection': bind('root.custom.selection', write=True)})
 small['events'] = {'onItemClicked': [{'kind': 'WriteTag', 'target': '[default]Clicked', 'value': scalar(7)}]}
-root = node('TreeRoot', 'Container', 0, 0, 1000, 820)
+root = node('TreeRoot', 'Container', 0, 0, 1000, 1000)
 root['custom'] = {'items': scalar(items), 'bad': scalar([1]), 'selection': scalar(''), 'reordered': scalar(list(reversed(items))), 'empty': scalar([])}
 root['children'] = [node('Title', 'Label', 20, 12, 960, 38, {'text': 'TREE COMPONENT LAB · hierarchical selection and virtualization', 'fontSize': 22}), small,
     node('LocalTags', 'TagBrowseTree', 520, 80, 450, 310, props(root='[default]Equipment')),
@@ -40,7 +40,11 @@ root['children'] = [node('Title', 'Label', 20, 12, 960, 38, {'text': 'TREE COMPO
     node('Mode', 'TextField', 250, 420, 180, 36, {'text': 'good'}, {'text': bind('[default]Mode', 'Tag', True)}),
     node('Readout', 'Label', 470, 420, 490, 44, {'text': ''}, {'text': bind('EquipmentTree.props.selectionData')}),
     node('LargeTree', 'Tree', 20, 500, 940, 280, props([{'id': 'tag-'+str(i), 'label': 'Measurement '+str(i).zfill(4), 'data': i} for i in range(1200)]))]
-fixture = {'schemaVersion': 1, 'name': 'Tree Component Lab', 'views': [{'path': 'Trees', 'width': 1000, 'height': 820, 'root': root}],
+root['children'].extend([
+    node('InvalidSelection', 'Tree', 20, 810, 440, 160, props(items, selectedPaths=42)),
+    node('ReadOnlySelection', 'Tree', 520, 810, 440, 160, props(items), {'selection': bind("''", 'Expression')})
+])
+fixture = {'schemaVersion': 1, 'name': 'Tree Component Lab', 'views': [{'path': 'Trees', 'width': 1000, 'height': 1000, 'root': root}],
     'pages': [{'path': '/', 'view': 'Trees'}], 'tags': [
         {'path': '[default]Mode', 'dataType': 'String', 'initialValue': scalar('good')},
         {'path': '[default]Clicked', 'dataType': 'Number', 'initialValue': scalar(0)},
@@ -81,6 +85,8 @@ with sync_playwright() as p:
         wait("window.scadaViews?.[0]?.components?.EquipmentTree?.tree?.rows.length > 0")
         check('tree fixture loads into the native Uno view host', tree()['count'] == 5 and tree()['visibleCount'] == 4 and tree()['enabled'])
         check('configured row height reaches native container geometry', all(abs(r['bounds']['height'] / app()['zoom'] - 28) < 1 for r in tree()['rows']))
+        check('malformed selection types produce an explicit component diagnostic', not tree('InvalidSelection')['enabled'] and 'array of strings' in tree('InvalidSelection')['error'])
+        check('read-only selection bindings disable user selection', not tree('ReadOnlySelection')['enabled'] and tree('ReadOnlySelection')['error'] is None)
         check('native row peers expose TreeItem and expansion state', all(r['role'] == 'TreeItem' for r in tree()['rows']) and row('0')['expansion'] == 'Expanded')
         rebuilds = tree()['rebuilds']; tick = app()['tick']
         wait(f'window.scadaApp.tick > {tick+2}')
@@ -126,6 +132,9 @@ with sync_playwright() as p:
         wait("window.scadaViews[0].components.LargeTree.tree.selection === '1199'")
         check('keyboard End reaches an initially unrealized row', tree('LargeTree')['selection'] == '1199' and any(r['path'] == '1199' for r in tree('LargeTree')['rows']))
         check('virtualized scrolling keeps realized row count bounded', len(tree('LargeTree')['rows']) < 100)
+        page.keyboard.press('Home'); wait("window.scadaViews[0].components.LargeTree.tree.selection === '0'")
+        check('keyboard Home returns from the recycled endpoint', any(r['path'] == '0' for r in tree('LargeTree')['rows']))
+        page.keyboard.press('End'); wait("window.scadaViews[0].components.LargeTree.tree.selection === '1199'")
         page.screenshot(path=str(OUT/'tree-runtime.png'), full_page=True)
         with page.expect_download() as event: command('export')
         event.value.save_as(OUT/'runtime-export.json')
