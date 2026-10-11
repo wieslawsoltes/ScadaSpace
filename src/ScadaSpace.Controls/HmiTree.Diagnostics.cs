@@ -6,6 +6,8 @@ public sealed partial class HmiTree
 {
     public TextBox FilterInput => FilterBox;
     public int VisibleCount => _rows.Count;
+    public string LastNavigationKey => RowsList.LastKey;
+    public string? FocusedPath => RowsList.FocusedItem?.Row?.Path;
     public string? DataError { get; private set; }
     public void SetDataError(string? error)
     {

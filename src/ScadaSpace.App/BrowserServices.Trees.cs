@@ -28,7 +28,8 @@ internal static partial class BrowserServices
         {
             count = tree.ItemCount, visibleCount = tree.VisibleCount, rebuilds = tree.RebuildCount,
             selection = tree.CurrentPath, selectedPaths = tree.SelectedPaths, selectionData = tree.SelectionData,
-            enabled = tree.IsEnabled, error = tree.DataError, filter = Bounds(tree.FilterInput),
+            enabled = tree.IsEnabled, error = tree.DataError, filter = Bounds(tree.FilterInput), filterText = tree.Filter,
+            lastKey = tree.LastNavigationKey, focusedPath = tree.FocusedPath,
             rows = tree.RealizedRows.OrderBy(c => c.Row!.Path, StringComparer.Ordinal).Select(container =>
             {
                 var peer = FrameworkElementAutomationPeer.CreatePeerForElement(container);

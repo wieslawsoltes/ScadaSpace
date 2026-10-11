@@ -13,6 +13,7 @@ public sealed partial class HmiTreeListView : ListView
     private readonly HashSet<HmiTreeListItem> _containers = [];
     private string? _pendingFocusKey;
     internal HmiTree? TreeOwner { get; set; }
+    internal string LastKey { get; private set; } = "";
     public IReadOnlyList<HmiTreeListItem> RealizedRows => _containers.Where(c => c.IsLoaded && c.Row is not null).ToArray();
     internal HmiTreeListItem? FocusedItem
     {
@@ -47,7 +48,6 @@ public sealed partial class HmiTreeListView : ListView
         if (element is HmiTreeListItem container && item is TreeRowViewModel row)
         {
             container.Row = row; _containers.Add(container);
-            // Derived containers do not inherit every default ListViewItem style setter on all Uno targets.
             container.Height = row.Height; container.MinHeight = 0; container.Padding = new Thickness(0);
             container.HorizontalContentAlignment = HorizontalAlignment.Stretch;
             container.VerticalContentAlignment = VerticalAlignment.Stretch;
@@ -64,7 +64,7 @@ public sealed partial class HmiTreeListView : ListView
         base.ClearContainerForItemOverride(element, item);
     }
     protected override void OnKeyDown(KeyRoutedEventArgs e)
-    { if (TreeOwner?.HandleTreeKey(e) == true) e.Handled = true; else base.OnKeyDown(e); }
+    { LastKey = e.Key.ToString(); if (TreeOwner?.HandleTreeKey(e) == true) e.Handled = true; else base.OnKeyDown(e); }
     protected override AutomationPeer OnCreateAutomationPeer() => new TreePeer(this);
     private sealed class TreePeer(HmiTreeListView owner) : ListViewAutomationPeer(owner)
     {

@@ -70,7 +70,10 @@ with sync_playwright() as p:
     def select(path, name='EquipmentTree'):
         box = row(path, name)['bounds']; page.mouse.click(box['x']+min(box['width']-12, 125), box['y']+box['height']/2); page.wait_for_timeout(350)
     def toggle(path, name='EquipmentTree'): click(row(path, name)['toggle']); page.wait_for_timeout(450)
-    def fill(box, value): click(box); page.keyboard.press('Control+a'); page.keyboard.insert_text(value); page.keyboard.press('Enter'); page.wait_for_timeout(400)
+    def fill(box, value):
+        click(box); page.keyboard.press('Control+a'); page.keyboard.press('Backspace')
+        if value: page.keyboard.insert_text(value)
+        page.keyboard.press('Enter'); page.wait_for_timeout(400)
     def check(name, condition):
         results.append({'name': name, 'passed': bool(condition)})
         if not condition: raise AssertionError(name)
@@ -129,12 +132,12 @@ with sync_playwright() as p:
         check('local tag browse selection returns the actual full tag path', tree('LocalTags')['selectionData']['items'][0]['fields']['value']['text'] == '[default]Equipment/Pump/Flow')
         check('large trees virtualize native row containers', tree('LargeTree')['count'] == 1200 and 0 < len(tree('LargeTree')['rows']) < 100)
         select('0', 'LargeTree'); page.keyboard.press('End')
-        wait("window.scadaViews[0].components.LargeTree.tree.selection === '1199'")
+        wait("window.scadaViews[0].components.LargeTree.tree.selection === '1199' && window.scadaViews[0].components.LargeTree.tree.rows.some(r => r.path === '1199')")
         check('keyboard End reaches an initially unrealized row', tree('LargeTree')['selection'] == '1199' and any(r['path'] == '1199' for r in tree('LargeTree')['rows']))
         check('virtualized scrolling keeps realized row count bounded', len(tree('LargeTree')['rows']) < 100)
-        page.keyboard.press('Home'); wait("window.scadaViews[0].components.LargeTree.tree.selection === '0'")
+        page.keyboard.press('Home'); wait("window.scadaViews[0].components.LargeTree.tree.selection === '0' && window.scadaViews[0].components.LargeTree.tree.rows.some(r => r.path === '0')")
         check('keyboard Home returns from the recycled endpoint', any(r['path'] == '0' for r in tree('LargeTree')['rows']))
-        page.keyboard.press('End'); wait("window.scadaViews[0].components.LargeTree.tree.selection === '1199'")
+        page.keyboard.press('End'); wait("window.scadaViews[0].components.LargeTree.tree.selection === '1199' && window.scadaViews[0].components.LargeTree.tree.rows.some(r => r.path === '1199')")
         page.screenshot(path=str(OUT/'tree-runtime.png'), full_page=True)
         with page.expect_download() as event: command('export')
         event.value.save_as(OUT/'runtime-export.json')
