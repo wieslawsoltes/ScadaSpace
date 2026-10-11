@@ -12,15 +12,16 @@ public sealed class ProjectRuntime : IDisposable
     public AuditLog Audit { get; } = new();
     public TagStore Tags { get; }
     public Historian History { get; }
+    public HistoryQueryCache HistoryQueries { get; }
     public AlarmEngine Alarms { get; }
     public ExpressionEngine Expressions { get; } = new();
     public ProjectRuntime(ProjectDefinition project, TimeProvider? clock = null)
     {
         var errors = ProjectCodec.Validate(project);
         if (errors.Count > 0) throw new ArgumentException(string.Join("; ", errors.Select(x => x.Message)));
-        Project = project; Tags = new(project.Tags, Audit, clock); History = new(Tags); Alarms = new(Tags, project.Alarms, Audit, clock);
+        Project = project; Tags = new(project.Tags, Audit, clock); History = new(Tags); HistoryQueries = new(History); Alarms = new(Tags, project.Alarms, Audit, clock);
     }
-    public ViewInstance CreateView(string path, IReadOnlyDictionary<string, Scalar>? parameters = null) => new(Project.Views.First(v => v.Path == path), Tags, parameters, Expressions);
+    public ViewInstance CreateView(string path, IReadOnlyDictionary<string, Scalar>? parameters = null) => new ViewInstance(Project.Views.First(v => v.Path == path), Tags, parameters, Expressions).WithHistory(History, HistoryQueries);
     public void UpdateViews(ProjectDefinition project) => Project = project;
     public void Dispose() { Alarms.Dispose(); History.Dispose(); }
 }
