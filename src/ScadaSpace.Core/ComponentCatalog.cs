@@ -29,6 +29,8 @@ public static class ComponentCatalog
         new("RadioGroup", "Radio Group", "Input", 190, 110, Props(("value", S("Auto")), ("options", S("Off,Hand,Auto")))),
         new("DateTimeInput", "Date Input", "Input", 210, 40, Props(("value", S("2026-01-01")))),
         new("Table", "Table", "Display", 480, 240, Props(("source", S("tags")), ("data", S("[]")), ("filter", S("")))),
+        new("Tree", "Tree", "Display", 320, 300, Props(("items", Scalar.FromJson("[{\"label\":\"Equipment\",\"expanded\":true,\"items\":[{\"label\":\"Pump\",\"data\":\"Pump01\"},{\"label\":\"Tank\",\"data\":\"Tank01\"}]}]")), ("selection", S("")), ("selectedPaths", Scalar.Array([])), ("selectionData", Scalar.Array([])), ("filter", S("")), ("showFilter", Scalar.From(true)), ("interactable", Scalar.From(true)), ("multiSelect", Scalar.From(false)), ("rowHeight", N(28)))),
+        new("TagBrowseTree", "Tag Browse Tree (local)", "Display", 340, 300, Props(("root", S("")), ("selection", S("")), ("selectedPaths", Scalar.Array([])), ("selectionData", Scalar.Array([])), ("filter", S("")), ("showFilter", Scalar.From(true)), ("interactable", Scalar.From(true)), ("multiSelect", Scalar.From(false)), ("rowHeight", N(28)))),
         new("AlarmStatusTable", "Alarm Status Table", "Alarming", 660, 240, Props(("showShelved", Scalar.From(true)))),
         new("AlarmJournalTable", "Alarm Journal Table", "Alarming", 660, 240, Props()),
         new("Rectangle", "Rectangle", "Drawing", 160, 80, Props(("color", S("#E7ECEF")), ("stroke", S("#9DAAB2")), ("strokeWidth", N(1)), ("radius", N(0)))),

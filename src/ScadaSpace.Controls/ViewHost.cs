@@ -139,6 +139,8 @@ public partial class ViewHost : Canvas, IDisposable
                     var series = paths.Select((path, i) => new PlotSeries(path, ChartRenderer.Palette[i % ChartRenderer.Palette.Length], Runtime!.History.Query(path))).ToArray();
                     chart.SetData(series, new(Text(node, "title", "Live trends"), Number(node, "minimum"), Number(node, "maximum", 100), firstRefresh ? Number(node, "windowSeconds", 120) : chart.Options.WindowSeconds)); firstRefresh = false;
                 }); element = chart; break;
+            case "Tree": case "TagBrowseTree":
+                element = BuildTree(node); break;
             case "Table": case "AlarmStatusTable": case "AlarmJournalTable":
                 var table = new HmiDataTable();
                 if (node.Type == "AlarmStatusTable")
