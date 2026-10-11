@@ -21,16 +21,36 @@ public sealed class Historian : IDisposable
         private readonly QualifiedValue[] _items = new QualifiedValue[capacity];
         private int _head;
         private int _count;
+        public int Count => _count;
         public QualifiedValue? Last => _count == 0 ? null : _items[(_head + _count - 1) % capacity];
         public void Add(QualifiedValue value)
         {
             if (_count < capacity) { _items[(_head + _count) % capacity] = value; _count++; }
             else { _items[_head] = value; _head = (_head + 1) % capacity; }
         }
-        public QualifiedValue[] Copy()
+        private QualifiedValue At(int index) => _items[(_head + index) % capacity];
+        private int Bound(DateTimeOffset timestamp, bool upper)
         {
-            var result = new QualifiedValue[_count];
-            for (var i = 0; i < _count; i++) result[i] = _items[(_head + i) % capacity];
+            var low = 0; var high = _count;
+            while (low < high)
+            {
+                var mid = low + (high - low) / 2; var value = At(mid).Timestamp;
+                if (value < timestamp || upper && value == timestamp) low = mid + 1;
+                else high = mid;
+            }
+            return low;
+        }
+        public QualifiedValue[] Query(DateTimeOffset? start, DateTimeOffset? end)
+        {
+            var first = start.HasValue ? Bound(start.Value, false) : 0;
+            var last = end.HasValue ? Bound(end.Value, true) : _count;
+            if (last <= first) return [];
+            var result = new QualifiedValue[last - first];
+            // At most two contiguous copies, even when retention has wrapped the ring.
+            var offset = (_head + first) % capacity;
+            var length = Math.Min(result.Length, capacity - offset);
+            Array.Copy(_items, offset, result, 0, length);
+            if (length < result.Length) Array.Copy(_items, 0, result, length, result.Length - length);
             return result;
         }
     }
@@ -63,9 +83,13 @@ public sealed class Historian : IDisposable
         if (start > end) throw new ArgumentException("Start must not follow end.");
         lock (_gate)
             return _series.TryGetValue(path, out var ring)
-                ? ring.Copy().Where(x => (!start.HasValue || x.Timestamp >= start.Value) && (!end.HasValue || x.Timestamp <= end.Value)).ToArray()
+                ? ring.Query(start, end)
                 : [];
     }
+    /// <summary>Number of retained samples without allocating a query result.</summary>
+    public int Count(string path) { lock (_gate) return _series.TryGetValue(path, out var ring) ? ring.Count : 0; }
+    /// <summary>Latest retained qualified sample, or null for an unknown/unrecorded path.</summary>
+    public QualifiedValue? Latest(string path) { lock (_gate) return _series.TryGetValue(path, out var ring) ? ring.Last : null; }
     public HistoryBucket[] Aggregate(string path, DateTimeOffset start, DateTimeOffset end, int bucketCount, AggregateKind kind)
     {
         if (bucketCount is < 1 or > 10000 || end <= start || !Enum.IsDefined(kind)) throw new ArgumentException("Invalid aggregation interval or kind.");
@@ -124,9 +148,9 @@ public sealed class Historian : IDisposable
     }
     public string ExportCsv(string path, DateTimeOffset? start = null, DateTimeOffset? end = null)
     {
-        static string Cell(string s) => "\"" + (s.Length > 0 && "=+-@\t\r".Contains(s[0]) ? "'" : "") + s.Replace("\"", "\"\"") + "\"";
+        static string Cell(string s, bool protect = true) => "\"" + (protect && s.TrimStart().Length > 0 && "=+-@".Contains(s.TrimStart()[0]) ? "'" : "") + s.Replace("\"", "\"\"") + "\"";
         var text = new StringBuilder("timestamp,tag,value,quality,revision\r\n");
-        foreach (var point in Query(path, start, end)) text.Append(point.Timestamp.ToString("O", CultureInfo.InvariantCulture)).Append(',').Append(Cell(path)).Append(',').Append(Cell(point.Value.ToString())).Append(',').Append(point.Quality).Append(',').Append(point.Revision).Append("\r\n");
+        foreach (var point in Query(path, start, end)) text.Append(point.Timestamp.ToString("O", CultureInfo.InvariantCulture)).Append(',').Append(Cell(path)).Append(',').Append(Cell(point.Value.Kind == ScalarKind.Number ? point.Value.Number.ToString("R", CultureInfo.InvariantCulture) : point.Value.ToString(), point.Value.Kind != ScalarKind.Number)).Append(',').Append(point.Quality).Append(',').Append(point.Revision).Append("\r\n");
         return text.ToString();
     }
     public void Dispose() => _subscription.Dispose();
