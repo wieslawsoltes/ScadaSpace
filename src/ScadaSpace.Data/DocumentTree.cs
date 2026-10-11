@@ -142,6 +142,11 @@ public sealed class DocumentTreeState
         if (filter is null || filter.Length > 1024) throw new ArgumentException("Tree filter exceeds 1024 characters.");
         filter = string.IsNullOrWhiteSpace(filter) ? "" : filter;
         if (_visible is not null && _filter == filter) return _visible;
+        return BuildProjection(filter);
+    }
+    // Keep the cache hit outside the closure-bearing traversal so it allocates nothing.
+    private IReadOnlyList<DocumentTreeRow> BuildProjection(string filter)
+    {
         var rows = new List<DocumentTreeRow>();
         HashSet<string>? matches = null;
         if (!string.IsNullOrWhiteSpace(filter))

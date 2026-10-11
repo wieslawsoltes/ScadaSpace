@@ -30,7 +30,8 @@ def props(data=None, **extra):
     return {'items': data or [], 'selection': '', 'selectedPaths': [], 'selectionData': [], 'filter': '', 'showFilter': True, 'rowHeight': 28, 'interactable': True, **extra}
 small = node('EquipmentTree', 'Tree', 20, 80, 440, 310, props(items, multiSelect=True), {
     'items': bind("if({[default]Mode} == 'bad', {root.custom.bad}, if({[default]Mode} == 'reordered', {root.custom.reordered}, if({[default]Mode} == 'empty', {root.custom.empty}, {root.custom.items})))", 'Expression'),
-    'selection': bind('root.custom.selection', write=True)})
+    'selection': bind('root.custom.selection', write=True),
+    'selectedPaths': bind('[default]SelectedPaths', 'Tag', True)})
 small['events'] = {'onItemClicked': [{'kind': 'WriteTag', 'target': '[default]Clicked', 'value': scalar(7)}]}
 root = node('TreeRoot', 'Container', 0, 0, 1000, 1000)
 root['custom'] = {'items': scalar(items), 'bad': scalar([1]), 'selection': scalar(''), 'reordered': scalar(list(reversed(items))), 'empty': scalar([])}
@@ -40,6 +41,9 @@ root['children'] = [node('Title', 'Label', 20, 12, 960, 38, {'text': 'TREE COMPO
     node('Mode', 'TextField', 250, 420, 180, 36, {'text': 'good'}, {'text': bind('[default]Mode', 'Tag', True)}),
     node('Readout', 'Label', 470, 420, 490, 44, {'text': ''}, {'text': bind('EquipmentTree.props.selectionData')}),
     node('LargeTree', 'Tree', 20, 500, 940, 280, props([{'id': 'tag-'+str(i), 'label': 'Measurement '+str(i).zfill(4), 'data': i} for i in range(1200)]))]
+clear = node('ClearSelection', 'Button', 520, 463, 290, 32, {'text': 'Clear selection'})
+clear['events'] = {'onAction': [{'kind': 'WriteTag', 'target': '[default]SelectedPaths', 'value': scalar([])}]}
+root['children'].append(clear)
 root['children'].extend([
     node('InvalidSelection', 'Tree', 20, 810, 440, 160, props(items, selectedPaths=42)),
     node('ReadOnlySelection', 'Tree', 520, 810, 440, 160, props(items), {'selection': bind("''", 'Expression')})
@@ -47,6 +51,7 @@ root['children'].extend([
 fixture = {'schemaVersion': 1, 'name': 'Tree Component Lab', 'views': [{'path': 'Trees', 'width': 1000, 'height': 1000, 'root': root}],
     'pages': [{'path': '/', 'view': 'Trees'}], 'tags': [
         {'path': '[default]Mode', 'dataType': 'String', 'initialValue': scalar('good')},
+        {'path': '[default]SelectedPaths', 'dataType': 'Array', 'initialValue': scalar([])},
         {'path': '[default]Clicked', 'dataType': 'Number', 'initialValue': scalar(0)},
         {'path': '[default]Equipment/Pump/Flow', 'initialValue': scalar(42)},
         {'path': '[default]Equipment/Tank/Level', 'initialValue': scalar(60)}], 'alarms': []}
@@ -107,6 +112,10 @@ with sync_playwright() as p:
         check('Right expands a keyboard-focused branch', tree()['visibleCount'] == 5)
         select('0/0'); page.keyboard.down('Control'); select('0/1'); page.keyboard.up('Control')
         check('Ctrl-click retains multiple selected nodes', set(tree()['selectedPaths']) == {'0/0','0/1'})
+        click(component('ClearSelection')['bounds'])
+        wait("window.scadaViews[0].components.EquipmentTree.tree.selection === '' && window.scadaViews[0].components.EquipmentTree.tree.selectedPaths.length === 0")
+        check('an explicitly empty bound selectedPaths array clears all selection outputs', tree()['selectionData']['items'] == [] and component('SelectionInput')['text']['value']['text'] == '')
+        select('0/0'); page.keyboard.down('Control'); select('0/1'); page.keyboard.up('Control')
         fill(tree()['filter'], 'Motor')
         check('filter reveals matching ancestors', [r['label'] for r in sorted(tree()['rows'], key=lambda r: r['bounds']['y'])] == ['Plant','Pump','Motor'])
         fill(tree()['filter'], '')

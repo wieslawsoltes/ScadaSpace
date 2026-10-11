@@ -40,9 +40,11 @@ public partial class ViewHost
                     throw new FormatException("Selection requires a string and selectedPaths requires an array of strings.");
                 if (paths != previousPaths || selection != previousSelection)
                 {
-                    var requested = paths != previousPaths && paths.Kind == ScalarKind.Array && paths.Items.Count > 0
-                        ? paths.Items.Select(v => v.Kind == ScalarKind.String ? v.Text! : throw new FormatException("Selected paths must be strings.")).ToArray()
-                        : selection.Kind == ScalarKind.String && selection.Text!.Length > 0 ? [selection.Text!] : Array.Empty<string>();
+                    // A changed, explicitly empty selectedPaths array clears existing selection.
+                    // On first load, an empty default array still permits a primary selection input.
+                    var usePaths = paths != previousPaths && (paths.Items.Count > 0 || previousPaths.Kind == ScalarKind.Array);
+                    var requested = usePaths ? paths.Items.Select(v => v.Text!).ToArray()
+                        : selection.Text!.Length > 0 ? [selection.Text!] : Array.Empty<string>();
                     tree.SelectPaths(requested); previousPaths = paths; previousSelection = selection;
                 }
                 if (!IsEditing)
