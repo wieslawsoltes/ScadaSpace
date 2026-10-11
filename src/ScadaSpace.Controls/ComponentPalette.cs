@@ -79,6 +79,8 @@ public partial class ComponentPalette : Grid
                 item.Button.Padding=new Thickness(_tiles?2:10,2,_tiles?2:4,2);item.Button.HorizontalContentAlignment=_tiles?HorizontalAlignment.Center:HorizontalAlignment.Left;
                 item.Content.Orientation=_tiles?Orientation.Vertical:Orientation.Horizontal;item.Content.Spacing=_tiles?4:7;
                 ((DesignerIcon)item.Content.Children[0]).Width=((DesignerIcon)item.Content.Children[0]).Height=_tiles?24:15;
+                var label=(TextBlock)item.Content.Children[1];label.TextWrapping=_tiles?TextWrapping.Wrap:TextWrapping.NoWrap;
+                label.MaxWidth=_tiles?64:double.PositiveInfinity;label.MaxLines=_tiles?2:1;label.TextAlignment=_tiles?TextAlignment.Center:TextAlignment.Left;
                 index++;VisibleComponentCount++;
             }
         }

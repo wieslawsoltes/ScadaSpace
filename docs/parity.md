@@ -4,7 +4,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 | Area | Implemented | Remaining boundary |
 |---|---|---|
-| Designer shell | Menus, toolbars, project/tag panes, palette, inspector, view tabs, resizable panels | Not pixel-identical; no licensed icon pack, arbitrary dock layout or complete designer window parity; dedicated nested-property tree editor not published |
+| Designer shell | Compact vector commands, persistent project/tag/property panes, auto-hidden/pinned searchable list/tile palette, non-destructive bottom resource tabs and resizable panels | Not pixel-identical; no licensed icon pack, arbitrary dock layout or complete designer window parity; dedicated nested-property tree editor not published |
 | Canvas editing | Pointer selection, additive selection, marquee, snapped move/resize, alignment, z-order, clipboard, undo/redo, rulers and zoom | No full nested transformed-coordinate editing, constraint solver or complete Perspective designer shortcut/menu parity |
 | Project model | Validated JSON, views, pages, style classes, parameters, custom props and actions | Own schema; does not import/export Ignition project archives |
 | Values and tags | Qualified scalar/object/array values, immutable nested writes, memory provider, revisions, write checks, subscriptions, local audit | No real OPC-UA/device transport, UDT inheritance, complete Ignition dataset/document semantics, remote providers or Gateway tag manager |
@@ -41,3 +41,5 @@ No proprietary implementation or graphical assets from these references are incl
 See [page navigation and docked sessions](page-sessions.md) and [hierarchical trees](trees.md) for shipped behavior and explicit boundaries.
 
 See [local history bindings and review](history-bindings.md) for the added query APIs, streaming aggregation, table error recovery and the excluded chart-renderer work.
+
+See [designer workspace and UI review](designer-workspace.md) for the independently implemented layout, tab/pane behavior, control reuse, keyboard fixes and remaining visual boundaries.

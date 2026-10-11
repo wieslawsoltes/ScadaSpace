@@ -7,7 +7,7 @@ internal static partial class BrowserServices
     public static string? LoadWorkspace()
     {
 #if __WASM__
-        return Uno.Foundation.WebAssemblyRuntime.InvokeJS("localStorage.getItem('scadaspace.workspace.v1') || ''");
+        return Uno.Foundation.WebAssemblyRuntime.InvokeJS("(()=>{try{return localStorage.getItem('scadaspace.workspace.v1') || '';}catch{return '';}})()");
 #else
         var path=Path.Combine(DataDirectory,"workspace.json");return File.Exists(path)?File.ReadAllText(path):null;
 #endif

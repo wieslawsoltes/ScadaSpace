@@ -79,6 +79,7 @@ with sync_playwright() as p:
         check('View Reset Panels restores the default auto-hidden layout', not workspace()['panels']['componentsPinned'] and not workspace()['paletteVisible'] and workspace()['panels']['leftWidth']==235 and not workspace()['panels']['paletteTiles'])
         command('fit'); tank=app()['components']['Tank01']; click(tank['bounds']); page.wait_for_timeout(250)
         check('designer selection still reaches the original component', app()['selection']==['Tank01'])
+        page.screenshot(path=str(OUT/'designer-selected.png'),full_page=True)
         generation=app()['generation']; components=app()['componentCount']; explorer=workspace()['explorerNodesCreated']
         fill('project-filter','Trends'); page.keyboard.press('Delete'); page.wait_for_timeout(350)
         check('project filtering and text deletion cannot delete the selected component', app()['generation']==generation and app()['componentCount']==components and workspace()['explorerNodesCreated']==explorer)

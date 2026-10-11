@@ -63,7 +63,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         _explorer.ItemInvoked += (_, args) =>
         {
             var item = args.InvokedItem is TreeViewNode treeNode ? treeNode.Content as ExplorerItem : args.InvokedItem as ExplorerItem;
-            if (item?.Name == "Page Configuration") { RunDialog(EditPagesAsync); return; }
+            if (item?.IsPageConfiguration == true) { RunDialog(EditPagesAsync); return; }
             if (item?.View is not { } view) return;
             if (_view != view) OpenView(view);
             if (item.ComponentId is not null) { _document.Select(item.ComponentId); _surface.RefreshSelection(); }
@@ -183,12 +183,12 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         var previewButton = (DesignerToolButton)_commands["preview"]; previewButton.SetGlyph(_preview ? "design" : "preview"); previewButton.SetLabel(_preview ? "Design (F5)" : "Preview (F5)"); previewButton.IsEnabled = !_sessionMode && hasView;
         var simulationButton = (DesignerToolButton)_commands["simulation"]; simulationButton.SetGlyph(_simulator.Running ? "simulation" : "play"); simulationButton.SetLabel(_simulator.Running ? "Pause simulation" : "Resume simulation");
         foreach (var id in new[] { "cut", "copy", "paste", "delete", "front", "back", "align-left", "align-top" }) ((Button)_commands[id]).IsEnabled = !_preview && hasView;
-        _palette.IsHitTestVisible = !_preview; _palette.Opacity = _preview ? .55 : 1; _inspector.IsHitTestVisible = !_preview;
+        _palette.IsHitTestVisible = !_preview && hasView; _palette.Opacity = _preview || !hasView ? .55 : 1; _inspector.IsHitTestVisible = !_preview && hasView;
         _metrics.Text = $"{_tagDefinitions.Count} tags   {_runtime.Alarms.Status().Count(a => a.Active)} active alarms   Uno Skia   {_surface.Zoom * 100:0}%";
     }
     private void UpdateResponsiveLayout() => ArrangeDesignerPanels();
     private void SetStatus(string text) => _status.Text = text;
     public void ReportUnhandled(string message) { _errors.Add(message); while (_errors.Count > 20) _errors.RemoveAt(0); SetStatus(message); PublishTelemetry(); }
     public new void Dispose() { _timer.Stop(); FlushPanelPreferences(); if (_session is not null) { _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated; } _pageHost.Dispose(); _surface.Dispose(); _runtime?.Dispose(); }
-    private sealed record ExplorerItem(string Name, string? View = null, string? ComponentId = null) { public override string ToString() => Name; }
+    private sealed record ExplorerItem(string Name, string? View = null, string? ComponentId = null, bool IsPageConfiguration = false) { public override string ToString() => Name; }
 }
