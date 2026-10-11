@@ -25,6 +25,12 @@ public sealed class ViewInstance
     private readonly List<Diagnostic> _diagnostics = [];
     private long _revision;
     private bool _evaluating;
+    public Scalar PageProperties { get; private set; } = Scalar.Object([]);
+    public void SetPageProperties(Scalar properties)
+    {
+        if (properties.Kind != ScalarKind.Object || !properties.IsValid()) throw new ArgumentException("Page properties must be an object.");
+        PageProperties = properties; Invalidate();
+    }
     public ViewDefinition View { get; }
     public Dictionary<string, Scalar> Parameters { get; }
     public IReadOnlyList<Diagnostic> Diagnostics => _diagnostics;
@@ -207,6 +213,8 @@ public sealed class ViewInstance
     }
     public QualifiedValue ResolveReference(string reference, ComponentNode current)
     {
+        if (reference.StartsWith("page.props.", StringComparison.Ordinal))
+            return Extract(QualifiedValue.Good(PageProperties, DateTimeOffset.UtcNow), reference[11..]);
         if (reference.StartsWith('[')) return _tags.Read(reference);
         if (reference.StartsWith("view.params.", StringComparison.Ordinal))
         {
@@ -239,6 +247,7 @@ public sealed class ViewInstance
     public bool CanWrite(ComponentNode node, string property)
     {
         var (binding, _) = FindBinding(node, Qualify(property));
+        if (binding?.Kind == BindingKind.Property && binding.Source.StartsWith("page.props.", StringComparison.Ordinal)) return false;
         return (binding is null || binding.Enabled && binding.Bidirectional && binding.Kind is BindingKind.Tag or BindingKind.Property && binding.Transforms.Count == 0) && Read(node, property).IsGood;
     }
     public WriteResult Write(ComponentNode node, string property, Scalar value, string actor, long? expectedRevision = null)
@@ -268,6 +277,7 @@ public sealed class ViewInstance
             var updated = boundPath == path ? value : PropertyPath.Parse(Tail(path, boundPath.Length)).Set(parent.Value, value);
             WriteResult result;
             if (binding.Kind == BindingKind.Tag) result = _tags.Write(ResolveTagPath(binding.Source), updated, actor, expected ?? parent.Revision);
+            else if (binding.Source.StartsWith("page.props.", StringComparison.Ordinal)) return new(WriteStatus.ReadOnly, current, "Page properties are read-only.");
             else if (binding.Source.StartsWith("view.params.", StringComparison.Ordinal)) result = WriteParameter(binding.Source[12..], updated, expected ?? parent.Revision);
             else
             {
