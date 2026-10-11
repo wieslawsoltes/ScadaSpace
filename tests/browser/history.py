@@ -29,7 +29,7 @@ columns = [{'field': 'value', 'title': 'Value', 'type': 'Number'}, {'field': 'qu
 raw = json.dumps({'path': '[default]Value', 'start': '{root.custom.start}', 'end': 4102444800000, 'limit': '{root.custom.limit}'})
 average = json.dumps({'path': '[default]Value', 'start': 0, 'end': 4102444800000, 'aggregate': 'SampleAverage', 'returnSize': 1})
 root = node('Root', 'Container', 0, 0, 1000, 720)
-root['custom'] = {k: scalar(v) for k, v in {'limit':100, 'start':0, 'badColumns':False, 'columns':columns}.items()}
+root['custom'] = {k: scalar(v) for k, v in {'limit':100, 'start':0, 'badColumns':False, 'badBinding':False, 'columns':columns}.items()}
 children = [
     node('Heading', 'Label', 20, 12, 960, 42, {'text': 'LOCAL HISTORY · cached queries and recovery', 'fontSize': 24}),
     node('Limit', 'NumericEntry', 20, 68, 160, 38, {'value':100, 'minimum':1, 'maximum':1000}, {'value':binding('root.custom.limit',write=True)}),
@@ -37,8 +37,9 @@ children = [
     node('Start', 'NumericEntry', 220, 68, 210, 38, {'value':0, 'minimum':0, 'maximum':5000000000000}, {'value':binding('root.custom.start',write=True)}),
     node('StartLabel', 'Label', 220, 110, 210, 24, {'text':'Start (Unix milliseconds)'}),
     node('BadColumns', 'CheckBox', 470, 68, 250, 38, {'value':False,'text':'Invalid column fixture'}, {'value':binding('root.custom.badColumns',write=True)}),
+    node('BadBinding', 'CheckBox', 740, 68, 240, 38, {'value':False,'text':'Failed column binding'}, {'value':binding('root.custom.badBinding',write=True)}),
     node('RawA', 'Table', 20, 150, 460, 250, {'source':'data','data':[], 'columns':columns, 'editable':True},
-         {'data':binding(raw,'TagHistory'), 'columns':binding("if({root.custom.badColumns}, 'invalid', {root.custom.columns})",'Expression')}),
+         {'data':binding(raw,'TagHistory'), 'columns':binding("if({root.custom.badBinding}, 1/0, if({root.custom.badColumns}, 'invalid', {root.custom.columns}))",'Expression')}),
     node('RawB', 'Table', 520, 150, 460, 250, {'source':'data','data':[], 'columns':columns}, {'data':binding(raw,'TagHistory')}),
     node('AverageTable', 'Table', 20, 455, 660, 200, {'source':'data','data':[], 'columns':columns}, {'data':binding(average,'TagHistory')}),
     node('Average', 'LEDDisplay', 740, 470, 220, 72, {'value':0, 'unit':'sample mean'}, {'value':binding('AverageTable.props.data[0].value')}),
@@ -115,6 +116,10 @@ with sync_playwright() as p:
         check('malformed column configuration clears only the affected table',rows('RawA')==[] and 'columns must be an array' in component('RawA')['tableError'] and len(rows('RawB'))==3)
         press('BadColumns'); wait('window.scadaViews[0].components.RawA.tableError === null && window.scadaViews[0].components.RawA.rows.length === 3')
         check('column configuration errors recover without replacing project data',len(rows('RawA'))==3)
+        press('BadBinding'); wait('window.scadaViews[0].components.RawA.tableError !== null')
+        check('failed column bindings cannot silently fall back to inferred columns',rows('RawA')==[] and 'Column binding quality: BadExpression' in component('RawA')['tableError'] and len(rows('RawB'))==3)
+        press('BadBinding'); wait('window.scadaViews[0].components.RawA.tableError === null && window.scadaViews[0].components.RawA.rows.length === 3')
+        check('recovering a column expression restores data and quality',not view()['diagnostics'] and len(rows('RawA'))==3)
         box=component('RawA')['bounds']; scale=box['width']/460
         x=box['x']+40*scale; y=box['y']+43*scale
         page.mouse.click(x,y); page.mouse.click(x,y); wait("window.scadaViews[0].components.RawA.rows[0].cells[0] === '30'")

@@ -28,7 +28,10 @@ public partial class ViewHost
                 }
                 var data = sample.Value;
                 if (data.Kind == ScalarKind.String) data = Scalar.FromJson(data.Text!); // Legacy projects remain readable.
-                var columns = Value(node, "columns"); var key = Text(node, "rowKey");
+                var columnSample = Read(node, "columns");
+                var hasColumns = node.Props.ContainsKey("columns") || node.Bindings.ContainsKey("columns") || node.Bindings.ContainsKey("props.columns");
+                if (!columnSample.IsGood && (hasColumns || columnSample.Quality != Quality.BadNotFound)) throw new InvalidOperationException("Column binding quality: " + columnSample.Quality);
+                var columns = columnSample.IsGood ? columnSample.Value : Scalar.Null; var key = Text(node, "rowKey");
                 if (columns.Kind is not (ScalarKind.Null or ScalarKind.Array)) throw new FormatException("Table columns must be an array.");
                 if (model is not null && previousData == data && previousColumns == columns && previousKey == key) return;
                 var next = new DocumentTable(data, columns.Kind == ScalarKind.Array && columns.Items.Count > 0 ? columns.Items.Select(Column) : null, key);
