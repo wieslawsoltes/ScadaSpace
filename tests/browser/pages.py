@@ -40,7 +40,7 @@ fixture = {"schemaVersion": 1, "name": "Page Navigation Lab", "views": [
     ], {"equipment": "default"}),
     view("Navigation", 1000, 64, [button("GoHome", "Home", 12, "/"), button("GoA", "Equipment A", 210, "/equipment/A?mode=auto"), button("GoB", "Equipment B", 408, "/equipment/B?mode=manual")]),
     view("Sidebar", 200, 600, [node("SidebarLabel", "Label", 12, 35, 175, 70, {"text": "Shared local state", "fontSize": 19}), node("LocalCounter", "NumericEntry", 12, 125, 175, 40, {"value": 5, "minimum": 0, "maximum": 100})]),
-    view("Details", 280, 600, [node("DetailsTitle", "Label", 12, 40, 250, 60, {"text": "", "fontSize": 20}, "'Station: ' + {view.params.station}"), button("CloseDetails", "Close details", 12, "details", "CloseDock")], {"station": "default"})
+    view("Details", 280, 600, [node("DetailsTitle", "Label", 12, 80, 250, 60, {"text": "", "fontSize": 20}, "'Station: ' + {view.params.station}"), button("CloseDetails", "Close details", 12, "details", "CloseDock")], {"station": "default"})
 ], "pages": [
     {"path": "/", "view": "Home", "title": "Home"},
     {"path": "/equipment/:equipment", "view": "Equipment", "title": "Equipment", "docks": [{"id": "details", "view": "Details", "edge": "East", "display": "OnDemand", "content": "Cover", "size": 280, "modal": True}]},
@@ -131,6 +131,16 @@ with sync_playwright() as p:
         page.set_viewport_size({"width": 1600, "height": 1000}); wait("window.scadaApp.page.docks.find(d=>d.id==='side').pushes")
         route("/maintenance"); check("designer-configured page runs in the isolated session", app()["page"]["url"] == "/maintenance" and app()["view"] == "Home")
         route("/missing"); check("invalid navigation leaves the active page unchanged", app()["page"]["url"] == "/maintenance" and "Unknown page" in app()["status"])
+        route("/equipment/Łódź?mode=auto+%2B+manual")
+        expected_url = app()["page"]["url"]
+        check("Unicode route captures and escaped query delimiters reach native labels", component("EquipmentTitle")["text"]["value"]["text"] == "Equipment Łódź" and component("QueryLabel")["text"]["value"]["text"] == "Mode: auto + manual")
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function("window.scadaApp?.page && window.scadaApp.tick > 2", timeout=120000)
+        check("canonical Unicode page URL survives a full browser reload", app()["page"]["url"] == expected_url and component("EquipmentTitle")["text"]["value"]["text"] == "Equipment Łódź")
+        route("/equipment/" + "界" * 500)
+        check("oversized encoded URLs fail without changing the active page", app()["page"]["url"] == expected_url and "length limit" in app()["status"])
+        route("/equipment/A?mode=%FF")
+        check("malformed UTF-8 is rejected through the native navigation UI", app()["page"]["url"] == expected_url and "UTF-8" in app()["status"])
         route("/equipment/all"); check("static route wins over the dynamic pattern", app()["view"] == "Home")
         with page.expect_download() as event: command("export")
         event.value.save_as(OUT / "runtime-export.json")

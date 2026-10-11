@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.UI.Xaml;
 using ScadaSpace.Core;
 using ScadaSpace.Graphics;
@@ -7,7 +8,7 @@ using Windows.Foundation;
 namespace ScadaSpace.Controls;
 public partial class HmiSymbol : SKCanvasElement
 {
-    private static DependencyProperty Register<T>(string name, T value) => DependencyProperty.Register(name, typeof(T), typeof(HmiSymbol), new PropertyMetadata(value, (o, _) => ((HmiSymbol)o).Invalidate()));
+    private static DependencyProperty Register<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors | DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.PublicProperties)] T>(string name, T value) => DependencyProperty.Register(name, typeof(T), typeof(HmiSymbol), new PropertyMetadata(value, (o, _) => ((HmiSymbol)o).Invalidate()));
     public static readonly DependencyProperty KindProperty = Register(nameof(Kind), SymbolKind.Tank);
     public static readonly DependencyProperty ValueProperty = Register(nameof(Value), 0d);
     public static readonly DependencyProperty MinimumProperty = Register(nameof(Minimum), 0d);
