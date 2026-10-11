@@ -28,7 +28,7 @@ public partial class PropertyInspector : Grid
     }
     public void Inspect(DesignerDocument document, string? id, ViewHost host)
     {
-        _document = document; _host = host; _id = id; _fields.Children.Clear(); _live.Clear(); _message.Text = "";
+        _document = document; _host = host; _id = id; _fields.Children.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
         var node = id is null ? null : document.Find(id);
         if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); return; }
         _heading.Text = node.Name + "  ·  " + node.Type;
@@ -64,7 +64,7 @@ public partial class PropertyInspector : Grid
         _fields.Children.Add(ControlTheme.Button("+ Add to custom", async () => await AddPropertyAsync(true)));
         Section("EVENTS");
         foreach (var pair in node.Events) _fields.Children.Add(ControlTheme.Text("  " + pair.Key + "  ·  " + pair.Value.Count + " actions", 11));
-        _fields.Children.Add(ControlTheme.Button("Configure actions…", async () => await EditJsonAsync("Declarative event actions", JsonSerializer.Serialize(node.Events, ProjectCodec.Options), text => Edit("Configure event actions", n => n.Events = JsonSerializer.Deserialize<Dictionary<string, List<EventAction>>>(text, ProjectCodec.Options) ?? throw new FormatException("Events cannot be null.")), "Events map names such as onAction to WriteTag, ToggleTag, Navigate, OpenPopup, ClosePopup or SendMessage actions. Jython scripts are not supported.")));
+        BuildEventCommand(node);
         RefreshValues();
     }
     public void RefreshValues() { foreach (var update in _live) update(); }

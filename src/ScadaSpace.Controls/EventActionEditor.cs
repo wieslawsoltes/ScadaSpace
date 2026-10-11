@@ -37,7 +37,7 @@ public sealed partial class EventActionEditor : Grid
     public string ErrorText => _error.Text;
     public EventConfigurationDraft Draft => _draft;
 
-    public EventActionEditor(EventConfigurationDraft draft, ProjectDefinition project, string? initialEvent = null)
+    public EventActionEditor(EventConfigurationDraft draft, ProjectDefinition project, string? initialEvent = null, int initialAction = 0)
     {
         _draft = draft ?? throw new ArgumentNullException(nameof(draft));
         _tags = project.Tags.Select(t => t.Path).Take(512).ToArray();
@@ -73,6 +73,8 @@ public sealed partial class EventActionEditor : Grid
         void Tool(string text, string id, Action edit)
         {
             var button = ControlTheme.Button(text, () => TryEdit(edit)); button.Width = 27; button.MinWidth = 0; button.Height = 26; button.MinHeight = 0; button.Padding = new Thickness(0);
+            var name = id switch { "add" => "Add action", "remove" => "Remove action", "up" => "Move action up", "down" => "Move action down", _ => "Duplicate action" };
+            AutomationProperties.SetName(button, name); ToolTipService.SetToolTip(button, name);
             tools.Children.Add(button); Track(id, button);
         }
         Tool("+", "add", () => { CommitCurrent(); _draft.Add(_event, new(ActionKind.WriteTag, _tags.FirstOrDefault() ?? "", Scalar.From(0), Scalar.Object([]))); Reload(ActionCount - 1); });
@@ -96,7 +98,7 @@ public sealed partial class EventActionEditor : Grid
         _kind.SelectionChanged += (_, _) => { if (!_sync) ShowFields(); };
         _choices.SelectionChanged += (_, _) => { if (!_sync && _choices.SelectedItem is string target) _target.Text = target; };
         _event = initialEvent is not null && _events.ContainsKey(initialEvent) ? initialEvent : draft.EventNames.FirstOrDefault(n => draft.Actions(n).Count > 0) ?? draft.EventNames[0];
-        Reload(0);
+        Reload(initialAction);
     }
     private void Track(string id, FrameworkElement control) { _fields[id] = control; AutomationProperties.SetAutomationId(control, "event-editor-" + id); }
     public bool TryEdit(Action action)

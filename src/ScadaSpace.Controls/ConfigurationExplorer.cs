@@ -36,6 +36,6 @@ public sealed partial class ConfigurationExplorer : Grid
         if (ReferenceEquals(next, _rows)) return;
         var selected = Selected; _rows = next; _list.ItemsSource = _rows;
         _list.SelectedItem = selected is not null && _rows.Contains(selected) ? selected : _rows.FirstOrDefault();
-        _count.Text = $"{_rows.Count} matching configurations / {_index.Entries.Count} total · Go To Reference selects the component";
+        _count.Text = $"{_rows.Count} matching configurations / {_index.Entries.Count} total · Go To Reference selects the component and opens event/action settings";
     }
 }

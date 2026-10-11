@@ -34,6 +34,11 @@ public sealed partial class WorkbenchPage
             }
         });
         _surface.SelectionChanged += UpdateConfigurationCommands;
+        _inspector.EventsRequested += id =>
+        {
+            if (_preview || _sessionMode || _document.Find(id) is null) return;
+            _document.Select(id); _surface.RefreshSelection(); RunDialog(() => ConfigureEventsAsync());
+        };
     }
     private void UpdateConfigurationCommands()
     {
@@ -61,11 +66,11 @@ public sealed partial class WorkbenchPage
         };
         return dialog;
     }
-    private async Task ConfigureEventsAsync()
+    private async Task ConfigureEventsAsync(string? initialEvent = null, int initialAction = 0)
     {
         if (_preview || _sessionMode || _document.Selection.Count != 1) { SetStatus("Select one component in Design mode to configure events."); return; }
         var draft = new EventConfigurationDraft(_document, _document.Selection.Single());
-        _eventEditor = new EventActionEditor(draft, _document.Project);
+        _eventEditor = new EventActionEditor(draft, _document.Project, initialEvent, initialAction);
         var dialog = ConfigurationDialog("Event Configuration on " + draft.ComponentName, _eventEditor, "OK", "Apply");
         dialog.PrimaryButtonClick += (_, e) => e.Cancel = !_eventEditor.Apply(_document);
         dialog.SecondaryButtonClick += (_, e) => { _eventEditor.Apply(_document); e.Cancel = true; };
@@ -84,9 +89,10 @@ public sealed partial class WorkbenchPage
             e.Cancel = reference is null || _document.Find(reference.ComponentId) is null;
             if (e.Cancel) SetStatus("Select a configuration that still exists in this project.");
         };
+        ContentDialogResult result;
         try
         {
-            var result = await dialog.ShowAsync();
+            result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary && reference is not null)
             {
                 OpenView(reference.View); _document.Select(reference.ComponentId); _surface.RefreshSelection();
@@ -94,5 +100,7 @@ public sealed partial class WorkbenchPage
             }
         }
         finally { _configurationExplorer = null; _configurationButtons.Clear(); PublishTelemetry(); }
+        if (result == ContentDialogResult.Primary && reference?.EventName is { } eventName && !_preview && !_sessionMode)
+            await ConfigureEventsAsync(eventName, reference.ActionIndex ?? 0);
     }
 }
