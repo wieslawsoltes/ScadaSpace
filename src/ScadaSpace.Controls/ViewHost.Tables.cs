@@ -16,15 +16,34 @@ public partial class ViewHost
         var editing = false;
         _refresh.Add(() =>
         {
-            if (node.Type != "Table" || Text(node, "source", "tags") == "tags") { RefreshBuiltinTable(node, table); return; }
-            var data = Value(node, "data", Scalar.Array([]));
-            if (data.Kind == ScalarKind.String) data = Scalar.FromJson(data.Text!); // Existing projects remain readable.
-            var columns = Value(node, "columns"); var key = Text(node, "rowKey");
-            if (model is not null && previousData == data && previousColumns == columns && previousKey == key) return;
-            model = new DocumentTable(data, columns.Kind == ScalarKind.Array && columns.Items.Count > 0 ? columns.Items.Select(Column) : null, key);
-            previousData = data; previousColumns = columns; previousKey = key;
-            table.SetData(model.Columns.Select(c => new TableColumn(c.Field, c.Title, c.Weight)).ToArray(),
-                model.Rows.Select(r => new TableRow(r.Key, r.Cells.Select(x => x.ToString()).ToArray(), Values: r.Cells)).ToArray());
+            try
+            {
+                if (node.Type != "Table" || Text(node, "source", "tags") == "tags")
+                { model = null; RefreshBuiltinTable(node, table); table.SetDataError(null); return; }
+                var sample = Read(node, "data");
+                if (!sample.IsGood)
+                {
+                    var diagnostic = Instance?.Diagnostics.FirstOrDefault(d => d.Path == node.Id + ".props.data");
+                    throw new InvalidOperationException("Data quality: " + sample.Quality + (diagnostic is null ? "" : " · " + diagnostic.Message));
+                }
+                var data = sample.Value;
+                if (data.Kind == ScalarKind.String) data = Scalar.FromJson(data.Text!); // Legacy projects remain readable.
+                var columns = Value(node, "columns"); var key = Text(node, "rowKey");
+                if (columns.Kind is not (ScalarKind.Null or ScalarKind.Array)) throw new FormatException("Table columns must be an array.");
+                if (model is not null && previousData == data && previousColumns == columns && previousKey == key) return;
+                var next = new DocumentTable(data, columns.Kind == ScalarKind.Array && columns.Items.Count > 0 ? columns.Items.Select(Column) : null, key);
+                table.SetData(next.Columns.Select(c => new TableColumn(c.Field, c.Title, c.Weight)).ToArray(),
+                    next.Rows.Select(r => new TableRow(r.Key, r.Cells.Select(x => x.ToString()).ToArray(), Values: r.Cells)).ToArray());
+                model = next; previousData = data; previousColumns = columns; previousKey = key;
+                table.SetDataError(null);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException or System.Text.Json.JsonException)
+            {
+                var changed = table.DataError != ex.Message;
+                if (model is not null || changed) table.SetData([], []);
+                model = null; table.SetDataError(ex.Message);
+                if (changed) Error?.Invoke(ex.Message);
+            }
         });
         table.SelectionChanged += key =>
         {
@@ -67,7 +86,12 @@ public partial class ViewHost
         {
             if (item.Kind != ScalarKind.Object) throw new FormatException("Table columns must be objects.");
             var fields = item.Fields; var name = fields.GetValueOrDefault("field").ToString();
-            ScalarKind? type = fields.TryGetValue("type", out var value) && Enum.TryParse<ScalarKind>(value.ToString(), true, out var parsed) ? parsed : null;
+            ScalarKind? type = null;
+            if (fields.TryGetValue("type", out var value))
+            {
+                if (value.Kind != ScalarKind.String || !Enum.TryParse<ScalarKind>(value.Text, true, out var parsed) || !Enum.IsDefined(parsed)) throw new FormatException("Unknown table column type.");
+                type = parsed;
+            }
             return new(name, fields.GetValueOrDefault("title", Scalar.From(name)).ToString(), fields.GetValueOrDefault("weight", Scalar.From(1)).AsNumber(), fields.GetValueOrDefault("editable", Scalar.From(true)).AsBoolean(), type);
         }
     }
