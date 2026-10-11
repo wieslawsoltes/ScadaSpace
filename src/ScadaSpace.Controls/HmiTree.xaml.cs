@@ -116,7 +116,6 @@ public sealed partial class HmiTree : UserControl
         var accepted = false;
         try
         {
-            // Preflight the immutable payload before notifying a writeback consumer.
             var candidate = new DocumentTreeState(_state.Tree); candidate.Select(paths, current.Length == 0 ? null : current);
             accepted = SelectionRequested?.Invoke(new(paths, current, candidate.SelectionData)) ?? true;
             if (accepted) _state.Select(paths, current.Length == 0 ? null : current);
@@ -133,7 +132,7 @@ public sealed partial class HmiTree : UserControl
         if (e.Key == VirtualKey.Right)
         {
             if (item.Children.Count > 0 && !row.Row.Expanded) SetExpanded(item.Path, true);
-            else if (item.Children.Count > 0) select = item.Children[0].Path;
+            else if (item.Children.Count > 0) select = _rows.FirstOrDefault(r => r.Row.Item.ParentPath == item.Path)?.Path;
         }
         else if (row.Row.Expanded && item.Children.Count > 0) SetExpanded(item.Path, false);
         else select = item.ParentPath;

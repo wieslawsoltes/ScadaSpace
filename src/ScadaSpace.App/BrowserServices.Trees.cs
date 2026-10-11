@@ -26,10 +26,10 @@ internal static partial class BrowserServices
         }
         return new
         {
-            count = tree.ItemCount, visibleCount = tree.VisibleRows.Count, rebuilds = tree.RebuildCount,
+            count = tree.ItemCount, visibleCount = tree.VisibleCount, rebuilds = tree.RebuildCount,
             selection = tree.CurrentPath, selectedPaths = tree.SelectedPaths, selectionData = tree.SelectionData,
             enabled = tree.IsEnabled, error = tree.DataError, filter = Bounds(tree.FilterInput),
-            rows = tree.RealizedRows.Select(container =>
+            rows = tree.RealizedRows.OrderBy(c => c.Row!.Path, StringComparer.Ordinal).Select(container =>
             {
                 var peer = FrameworkElementAutomationPeer.CreatePeerForElement(container);
                 return new { path = container.Row!.Path, label = container.Row.Label, expanded = container.Row.Row.Expanded,

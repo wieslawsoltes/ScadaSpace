@@ -5,6 +5,7 @@ namespace ScadaSpace.Controls;
 public sealed partial class HmiTree
 {
     public TextBox FilterInput => FilterBox;
+    public int VisibleCount => _rows.Count;
     public string? DataError { get; private set; }
     public void SetDataError(string? error)
     {

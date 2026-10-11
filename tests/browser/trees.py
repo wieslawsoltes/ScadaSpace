@@ -15,6 +15,11 @@ def scalar(v):
     if isinstance(v, str): return {'kind': 'String', 'text': v}
     if isinstance(v, list): return {'kind': 'Array', 'items': [scalar(x) for x in v]}
     return {'kind': 'Object', 'fields': {k: scalar(x) for k, x in v.items()}}
+def native(v):
+    kind = v['kind']
+    if kind == 'Object': return {k: native(x) for k, x in v['fields'].items()}
+    if kind == 'Array': return [native(x) for x in v['items']]
+    return v.get({'Number':'number','Boolean':'boolean','String':'text'}.get(kind, 'null'))
 def node(name, kind, x, y, width, height, props=None, bindings=None):
     return {'id': name, 'name': name, 'type': kind, 'x': x, 'y': y, 'width': width, 'height': height, 'props': {k: scalar(v) for k, v in (props or {}).items()}, 'bindings': bindings or {}}
 def bind(source, kind='Property', write=False): return {'source': source, 'kind': kind, 'bidirectional': write}
@@ -24,11 +29,11 @@ items = [{'id': 'plant', 'label': 'Plant', 'expanded': True, 'items': [
 def props(data=None, **extra):
     return {'items': data or [], 'selection': '', 'selectedPaths': [], 'selectionData': [], 'filter': '', 'showFilter': True, 'rowHeight': 28, 'interactable': True, **extra}
 small = node('EquipmentTree', 'Tree', 20, 80, 440, 310, props(items, multiSelect=True), {
-    'items': bind("if({[default]Mode} == 'bad', {root.custom.bad}, {root.custom.items})", 'Expression'),
+    'items': bind("if({[default]Mode} == 'bad', {root.custom.bad}, if({[default]Mode} == 'reordered', {root.custom.reordered}, if({[default]Mode} == 'empty', {root.custom.empty}, {root.custom.items})))", 'Expression'),
     'selection': bind('root.custom.selection', write=True)})
 small['events'] = {'onItemClicked': [{'kind': 'WriteTag', 'target': '[default]Clicked', 'value': scalar(7)}]}
 root = node('TreeRoot', 'Container', 0, 0, 1000, 820)
-root['custom'] = {'items': scalar(items), 'bad': scalar([1]), 'selection': scalar('')}
+root['custom'] = {'items': scalar(items), 'bad': scalar([1]), 'selection': scalar(''), 'reordered': scalar(list(reversed(items))), 'empty': scalar([])}
 root['children'] = [node('Title', 'Label', 20, 12, 960, 38, {'text': 'TREE COMPONENT LAB · hierarchical selection and virtualization', 'fontSize': 22}), small,
     node('LocalTags', 'TagBrowseTree', 520, 80, 450, 310, props(root='[default]Equipment')),
     node('SelectionInput', 'TextField', 20, 420, 200, 36, {'text': ''}, {'text': bind('root.custom.selection', write=True)}),
@@ -75,6 +80,7 @@ with sync_playwright() as p:
         command('fit'); command('preview')
         wait("window.scadaViews?.[0]?.components?.EquipmentTree?.tree?.rows.length > 0")
         check('tree fixture loads into the native Uno view host', tree()['count'] == 5 and tree()['visibleCount'] == 4 and tree()['enabled'])
+        check('configured row height reaches native container geometry', all(abs(r['bounds']['height'] / app()['zoom'] - 28) < 1 for r in tree()['rows']))
         check('native row peers expose TreeItem and expansion state', all(r['role'] == 'TreeItem' for r in tree()['rows']) and row('0')['expansion'] == 'Expanded')
         rebuilds = tree()['rebuilds']; tick = app()['tick']
         wait(f'window.scadaApp.tick > {tick+2}')
@@ -93,7 +99,7 @@ with sync_playwright() as p:
         select('0/0'); page.keyboard.down('Control'); select('0/1'); page.keyboard.up('Control')
         check('Ctrl-click retains multiple selected nodes', set(tree()['selectedPaths']) == {'0/0','0/1'})
         fill(tree()['filter'], 'Motor')
-        check('filter reveals matching ancestors', [r['label'] for r in tree()['rows']] == ['Plant','Pump','Motor'])
+        check('filter reveals matching ancestors', [r['label'] for r in sorted(tree()['rows'], key=lambda r: r['bounds']['y'])] == ['Plant','Pump','Motor'])
         fill(tree()['filter'], '')
         check('clearing a filter restores local expansion state', tree()['visibleCount'] == 5)
         fill(component('SelectionInput')['bounds'], '0/0/0')
@@ -102,6 +108,17 @@ with sync_playwright() as p:
         check('malformed bound items disable interaction with a visible diagnostic', not tree()['enabled'] and 'objects' in tree()['error'])
         fill(component('Mode')['bounds'], 'good')
         check('valid data recovers the same control after a data error', tree()['enabled'] and tree()['error'] is None and tree()['count'] == 5)
+        fill(component('Mode')['bounds'], 'reordered')
+        check('explicit IDs preserve selection across source reordering', tree()['selection'] == '1/0/0' and tree()['selectionData']['items'][0]['fields']['value']['text'] == 'M1')
+        check('reordered selection writes its new path through the binding', component('SelectionInput')['text']['value']['text'] == '1/0/0')
+        fill(component('Mode')['bounds'], 'empty')
+        check('removed tree data prunes contextual and primary selection', tree()['count'] == 0 and tree()['selection'] == '' and tree()['selectedPaths'] == [])
+        fill(component('Mode')['bounds'], 'good')
+        check('replacement tree reconstructs valid expansion defaults', tree()['count'] == 5 and tree()['visibleCount'] == 4)
+        fill(component('SelectionInput')['bounds'], '99/invalid')
+        check('invalid external selection is diagnosed rather than silently ignored', not tree()['enabled'] and 'index path' in tree()['error'])
+        fill(component('SelectionInput')['bounds'], '')
+        check('corrected selection clears its error state', tree()['enabled'] and tree()['error'] is None)
         toggle('0/0', 'LocalTags'); toggle('0/0/0', 'LocalTags'); select('0/0/0/0', 'LocalTags')
         check('local tag browse selection returns the actual full tag path', tree('LocalTags')['selectionData']['items'][0]['fields']['value']['text'] == '[default]Equipment/Pump/Flow')
         check('large trees virtualize native row containers', tree('LargeTree')['count'] == 1200 and 0 < len(tree('LargeTree')['rows']) < 100)
@@ -114,7 +131,7 @@ with sync_playwright() as p:
         event.value.save_as(OUT/'runtime-export.json')
         exported = json.loads((OUT/'runtime-export.json').read_text())
         defaults = exported['views'][0]['root']
-        check('runtime tree interactions do not change saved defaults', defaults['custom']['selection']['text'] == '' and defaults['custom']['items'] == scalar(items))
+        check('runtime tree interactions do not change saved defaults', defaults['custom']['selection']['text'] == '' and native(defaults['custom']['items']) == items)
         check('tree views retain good binding quality', not app()['diagnostics'] and not app()['errors'] and not any(r['kind']=='pageerror' for r in logs))
         page.set_viewport_size({'width': 1024, 'height': 768}); command('fit')
         check('tree controls remain live at tablet width', tree()['enabled'] and tree('LargeTree')['count'] == 1200)

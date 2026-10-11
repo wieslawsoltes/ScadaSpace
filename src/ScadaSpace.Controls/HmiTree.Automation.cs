@@ -29,6 +29,10 @@ public sealed partial class HmiTreeListView : ListView
         if (element is HmiTreeListItem container && item is TreeRowViewModel row)
         {
             container.Row = row; _containers.Add(container);
+            // Derived containers do not inherit every default ListViewItem style setter on all Uno targets.
+            container.Height = row.Height; container.MinHeight = 0; container.Padding = new Thickness(0);
+            container.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            container.VerticalContentAlignment = VerticalAlignment.Stretch;
             AutomationProperties.SetName(container, row.Label);
             AutomationProperties.SetAutomationId(container, "tree-row-" + row.Path.Replace('/', '-'));
             AutomationProperties.SetLevel(container, row.Row.Item.Depth + 1);

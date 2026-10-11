@@ -17,7 +17,7 @@ The included water-treatment project has five views, eight typed simulated tags,
 | Library | Responsibility |
 |---|---|
 | `ScadaSpace.Core` | Project schema, components, immutable scalar/object/array values, qualified values, diagnostics and audit records |
-| `ScadaSpace.Data` | Typed document tables, stable row identities, multi-key queries, immutable edits and CSV |
+| `ScadaSpace.Data` | Typed document tables and trees, stable identities, queries, immutable edits and CSV |
 | `ScadaSpace.Tags` | Thread-safe memory provider, typed/ranged writes, optimistic revision checks, ordered subscriptions |
 | `ScadaSpace.Expressions` | Bounded expression compiler/interpreter, dependency discovery and lazy evaluation |
 | `ScadaSpace.History` | Bounded per-tag rings, time queries, aggregates, quality-preserving decimation and CSV |
@@ -27,13 +27,13 @@ The included water-treatment project has five views, eight typed simulated tags,
 | `ScadaSpace.Layout` | Coordinate, flex, responsive columns, breakpoint and tab layout calculations |
 | `ScadaSpace.Persistence` | Revision-checked, atomic, single-process file project repository |
 | `ScadaSpace.Graphics` | Skia vector symbols and time-series/bar/pie chart rendering, independent of Uno |
-| `ScadaSpace.Controls` | Reusable Uno symbols, charts, virtualized tables, view host, designer surface and inspectors |
+| `ScadaSpace.Controls` | Reusable Uno symbols, charts, virtualized tables/trees, view host, designer surface and inspectors |
 
 The core engines require no Uno UI. The graphics package can draw into a caller-provided `SKCanvas`. The Uno controls draw custom graphics through `SKCanvasElement`, sharing Uno's Skia composition surface rather than repeatedly copying rasterized screenshots into image controls.
 
 ## Components
 
-The catalog contains 31 concrete component types: Label, LEDDisplay, Tank, Thermometer, Progress, Gauge, TrendChart, BarChart, PieChart, Button, ToggleSwitch, CheckBox, NumericEntry, TextField, Slider, Dropdown, RadioGroup, DateTimeInput, Table, AlarmStatusTable, AlarmJournalTable, Rectangle, Ellipse, Line, Pipe, Pump, Valve, Motor, Container, EmbeddedView and FlexRepeater. These names describe ScadaSpace's own API, not binary-compatible Perspective classes.
+The catalog contains 33 concrete component types: Label, LEDDisplay, Tank, Thermometer, Progress, Gauge, TrendChart, BarChart, PieChart, Button, ToggleSwitch, CheckBox, NumericEntry, TextField, Slider, Dropdown, RadioGroup, DateTimeInput, Table, Tree, TagBrowseTree, AlarmStatusTable, AlarmJournalTable, Rectangle, Ellipse, Line, Pipe, Pump, Valve, Motor, Container, EmbeddedView and FlexRepeater. These names describe ScadaSpace's own API, not binary-compatible Perspective classes.
 
 ## Build and run
 
@@ -75,6 +75,10 @@ Data tables support numeric sorting, filtering, source-row identity, and validat
 The **Pages** editor configures routes such as `/equipment/:equipment`, primary views, titles, and shared/local docked views as one undoable transaction. **Session** launches the runtime with browser Back/Forward, a page address bar, and hash-based deep links suitable for GitHub Pages. Docked views support push/cover/automatic behavior, breakpoint switching, toggle handles, resizing, and page-local modality while preserving unchanged shared-view state.
 
 `RuntimeSession.NavigatePage` expands configured routes using typed parameters and separate query fields; `PageAddress.WithQuery` builds immutable, encoded addresses. Unicode URL limits are checked after encoding so accepted pages can be reloaded. See [page/session APIs, configuration and limits](docs/page-sessions.md).
+
+## Hierarchical Tree controls
+
+The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virtualized Uno control. They support hierarchical expansion, filtered ancestors, keyboard navigation, multi-selection, typed contextual data, bound selection, and stable optional item IDs. Local tag browsing groups the existing memory provider by provider and folder; it does not connect to a Gateway or discover devices. See [Tree APIs and configuration](docs/trees.md) for behavior and limits.
 
 ## Boundaries and security
 

@@ -32,6 +32,12 @@ var path = "[default]Plant/Pump/Enabled";
 var before = runtime.Tags.Read(path);
 var write = runtime.Tags.Write(path, Scalar.From(false), "package-consumer", before.Revision);
 Check(write.Success && !runtime.Tags.Read(path).Value.Boolean, "packaged provider accepts revision-checked writes");
+var tree = new DocumentTree(TagTreeBuilder.Build(runtime.Tags.Browse()));
+Check(tree.Items.Any(n => n.Data.Text == path), "packaged tag hierarchy retains full provider paths");
+var state = new DocumentTreeState(tree);
+var pump = tree.Items.First(n => n.Data.Text == path);
+state.Reveal(pump.Path); state.Select([pump.Path]);
+Check(state.Visible().Any(r => r.Item.Key == pump.Key) && state.SelectionData.Items[0].Fields["value"].Text == path, "packaged tree reveals selected context without Uno");
 '''
 logs = []
 try:
@@ -50,8 +56,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 4:
-            raise RuntimeError(f"Expected four executed package checks; got {count}")
+        if count != 6:
+            raise RuntimeError(f"Expected six executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):
