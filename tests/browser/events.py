@@ -105,8 +105,11 @@ with sync_playwright() as p:
         total=app()['configurationExplorer']['count'];builds=app()['configurationExplorer']['builds']
         explorer_field('search');page.keyboard.insert_text('ActionButton');wait('window.scadaApp.configurationExplorer.count===3')
         check('Configuration Explorer indexes and filters configured events and actions',total>=7 and app()['configurationExplorer']['selected']['componentName']=='ActionButton')
-        explorer_field('kind');page.keyboard.press('Home');page.keyboard.press('ArrowDown');page.keyboard.press('ArrowDown');page.keyboard.press('ArrowDown');page.keyboard.press('ArrowDown');page.keyboard.press('Enter')
-        wait('window.scadaApp.configurationExplorer.count===2')
+        explorer_field('kind')
+        wait("window.scadaApp.configurationExplorer.kindMenu?.some(item => item.name==='Action' && item.bounds?.width>0)")
+        option = next(item for item in app()['configurationExplorer']['kindMenu'] if item['name']=='Action')
+        click(option['bounds'])
+        wait('window.scadaApp.configurationExplorer.count===2 && window.scadaApp.configurationExplorer.kindMenu===null')
         check('configuration kind filter keeps action references and owned source details',app()['configurationExplorer']['selected']['kind']=='Action' and app()['configurationExplorer']['builds']==builds)
         page.screenshot(path=str(OUT/'configuration-explorer.png'),full_page=True)
         command('configuration-dialog-ok');wait('window.scadaApp.configurationExplorer===null')
