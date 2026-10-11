@@ -122,6 +122,7 @@ public sealed partial class ViewInstance
                     BindingKind.Property => Resolve(binding.Source),
                     BindingKind.Expression => _expressions.Evaluate(binding.Source, Resolve),
                     BindingKind.ExpressionStructure => EvaluateStructure(StructureTemplate(binding.Source), Resolve),
+                    BindingKind.TagHistory => ReadHistory(binding.Source, Resolve),
                     _ => throw new ExpressionException("Unsupported binding type.")
                 };
                 foreach (var transform in binding.Transforms)

@@ -80,6 +80,10 @@ The **Pages** editor configures routes such as `/equipment/:equipment`, primary 
 
 The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virtualized Uno control. They support hierarchical expansion, filtered ancestors, keyboard navigation, multi-selection, typed contextual data, bound selection, and stable optional item IDs. Local tag browsing groups the existing memory provider by provider and folder; it does not connect to a Gateway or discover devices. See [Tree APIs and configuration](docs/trees.md) for behavior and limits.
 
+## Local Tag History bindings
+
+`TagHistory` bindings expose the in-memory historian as read-only typed table data, with fixed or latest-sample-relative windows, expression-driven time/row options, explicit sample aggregates and shared bounded query caching. Failed data/column configurations clear old table rows and show a recoverable diagnostic. Reusable atomic history snapshots, quality-aware trace and viewport state APIs are also available; the existing chart UI is unchanged. See [history binding configuration and review](docs/history-bindings.md) for examples, tests and limits.
+
 ## Boundaries and security
 
 There is no real device driver, OPC-UA transport, Ignition Gateway protocol, Jython engine, SQL named-query service, enterprise identity provider, redundancy or safety certification. Local simulated actors are audit labels, **not authenticated identities**. Browser storage is readable by scripts on the same origin. Never put credentials or sensitive plant information in the demonstration. Separate browser sessions currently own independent simulation state.

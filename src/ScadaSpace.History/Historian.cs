@@ -9,7 +9,7 @@ public enum AggregateKind { Average, Minimum, Maximum, Count, Last }
 public sealed record HistoryBucket(DateTimeOffset Start, DateTimeOffset End, Scalar Value, Quality Quality, int Count);
 
 /// <summary>A bounded historian with explicit retention. Bucket averages are sample-weighted, not time-weighted.</summary>
-public sealed class Historian : IDisposable
+public sealed partial class Historian : IDisposable
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, Ring> _series = new(StringComparer.Ordinal);
@@ -22,12 +22,16 @@ public sealed class Historian : IDisposable
         private int _head;
         private int _count;
         public int Count => _count;
+        public QualifiedValue? First => _count == 0 ? null : At(0);
         public QualifiedValue? Last => _count == 0 ? null : _items[(_head + _count - 1) % capacity];
         public void Add(QualifiedValue value)
         {
             if (_count < capacity) { _items[(_head + _count) % capacity] = value; _count++; }
             else { _items[_head] = value; _head = (_head + 1) % capacity; }
         }
+        public QualifiedValue SampleAt(int index) => At(index);
+        public int LowerBound(DateTimeOffset time) => Bound(time, false);
+        public int UpperBound(DateTimeOffset time) => Bound(time, true);
         private QualifiedValue At(int index) => _items[(_head + index) % capacity];
         private int Bound(DateTimeOffset timestamp, bool upper)
         {
@@ -40,13 +44,14 @@ public sealed class Historian : IDisposable
             }
             return low;
         }
-        public QualifiedValue[] Query(DateTimeOffset? start, DateTimeOffset? end)
+        public QualifiedValue[] Query(DateTimeOffset? start, DateTimeOffset? end, bool includeBounds = false, int maxSamples = 1000000)
         {
             var first = start.HasValue ? Bound(start.Value, false) : 0;
             var last = end.HasValue ? Bound(end.Value, true) : _count;
+            if (includeBounds) { first = Math.Max(0, first - 1); last = Math.Min(_count, last + 1); }
             if (last <= first) return [];
+            if (last - first > maxSamples) throw new InvalidOperationException("History window exceeds sample limit; narrow the interval or use aggregation.");
             var result = new QualifiedValue[last - first];
-            // At most two contiguous copies, even when retention has wrapped the ring.
             var offset = (_head + first) % capacity;
             var length = Math.Min(result.Length, capacity - offset);
             Array.Copy(_items, offset, result, 0, length);
@@ -59,7 +64,6 @@ public sealed class Historian : IDisposable
         if (capacityPerTag is < 2 or > 1000000) throw new ArgumentOutOfRangeException(nameof(capacityPerTag));
         _capacity = capacityPerTag;
         _definitions = tags.Browse().Where(x => x.HistoryEnabled).ToDictionary(x => x.Path, StringComparer.Ordinal);
-        // Subscribe before seeding so changes cannot disappear between a snapshot and subscription.
         _subscription = tags.Subscribe(change => Append(change.Path, change.Current));
         foreach (var path in _definitions.Keys) Append(path, tags.Read(path));
     }
@@ -74,55 +78,23 @@ public sealed class Historian : IDisposable
                 if (value.Timestamp < last.Timestamp || (value.Timestamp == last.Timestamp && value.Revision <= last.Revision)) return false;
                 if (definition.HistoryDeadband > 0 && last.Quality == value.Quality && value.Value.Kind == ScalarKind.Number && last.Value.Kind == ScalarKind.Number && Math.Abs(last.Value.Number - value.Value.Number) < definition.HistoryDeadband) return false;
             }
-            ring.Add(value);
-            return true;
+            ring.Add(value); return true;
         }
     }
     public QualifiedValue[] Query(string path, DateTimeOffset? start = null, DateTimeOffset? end = null)
     {
         if (start > end) throw new ArgumentException("Start must not follow end.");
-        lock (_gate)
-            return _series.TryGetValue(path, out var ring)
-                ? ring.Query(start, end)
-                : [];
+        lock (_gate) return _series.TryGetValue(path, out var ring) ? ring.Query(start, end) : [];
     }
-    /// <summary>Number of retained samples without allocating a query result.</summary>
     public int Count(string path) { lock (_gate) return _series.TryGetValue(path, out var ring) ? ring.Count : 0; }
-    /// <summary>Latest retained qualified sample, or null for an unknown/unrecorded path.</summary>
     public QualifiedValue? Latest(string path) { lock (_gate) return _series.TryGetValue(path, out var ring) ? ring.Last : null; }
     public HistoryBucket[] Aggregate(string path, DateTimeOffset start, DateTimeOffset end, int bucketCount, AggregateKind kind)
     {
-        if (bucketCount is < 1 or > 10000 || end <= start || !Enum.IsDefined(kind)) throw new ArgumentException("Invalid aggregation interval or kind.");
-        var points = Query(path, start, end);
-        var ticks = (end - start).Ticks;
-        var groups = Enumerable.Range(0, bucketCount).Select(_ => new List<QualifiedValue>()).ToArray();
-        foreach (var point in points)
-        {
-            var index = Math.Min(bucketCount - 1, (int)((point.Timestamp - start).Ticks / (double)ticks * bucketCount));
-            groups[index].Add(point);
-        }
-        return groups.Select((group, index) =>
-        {
-            var good = group.Where(p => p.IsGood).ToArray();
-            var numbers = good.Where(p => p.Value.Kind == ScalarKind.Number).Select(p => p.Value.Number).ToArray();
-            var value = kind switch
-            {
-                AggregateKind.Count => Scalar.From(good.Length),
-                AggregateKind.Last when good.Length > 0 => good[^1].Value,
-                AggregateKind.Average when numbers.Length > 0 => Scalar.From(numbers.Average()),
-                AggregateKind.Minimum when numbers.Length > 0 => Scalar.From(numbers.Min()),
-                AggregateKind.Maximum when numbers.Length > 0 => Scalar.From(numbers.Max()),
-                _ => Scalar.Null
-            };
-            var quality = value.Kind == ScalarKind.Null ? Quality.BadNotFound : good.Length == group.Count ? Quality.Good : Quality.Uncertain;
-            return new HistoryBucket(start.AddTicks((long)(ticks * (index / (double)bucketCount))), start.AddTicks((long)(ticks * ((index + 1) / (double)bucketCount))), value, quality, good.Length);
-        }).ToArray();
+        ValidateAggregate(start, end, bucketCount, kind);
+        lock (_gate) return AggregateCore(_series.GetValueOrDefault(path), start, end, bucketCount, kind);
     }
-    /// <summary>
-    /// Time-bucketed extrema preserve spikes, endpoints and every quality transition.
-    /// Quality transitions may exceed the normal 2*pixels+2 budget: drawing an outage as a continuous good line is not permitted.
-    /// Input samples must be ordered by timestamp and revision, as returned by Query.
-    /// </summary>
+
+    /// <summary>Preserves extrema, endpoints and all quality transitions, which may exceed the nominal pixel budget.</summary>
     public static QualifiedValue[] Decimate(IReadOnlyList<QualifiedValue> points, int pixels)
     {
         if (pixels is < 1 or > 1000000) throw new ArgumentOutOfRangeException(nameof(pixels));

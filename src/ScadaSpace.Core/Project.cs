@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace ScadaSpace.Core;
 
 public enum LayoutKind { Coordinate, FlexRow, FlexColumn, Column, Breakpoint, Tab }
-public enum BindingKind { Tag, Property, Expression, ExpressionStructure }
+public enum BindingKind { Tag, Property, Expression, ExpressionStructure, TagHistory }
 public enum TransformKind { Expression, Scale, Format, Map }
 public enum ActionKind { WriteTag, ToggleTag, Navigate, OpenPopup, ClosePopup, SendMessage, OpenDock, CloseDock, ToggleDock, NavigateBack, NavigateForward }
 
