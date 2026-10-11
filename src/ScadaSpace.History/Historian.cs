@@ -29,6 +29,9 @@ public sealed partial class Historian : IDisposable
             if (_count < capacity) { _items[(_head + _count) % capacity] = value; _count++; }
             else { _items[_head] = value; _head = (_head + 1) % capacity; }
         }
+        public QualifiedValue SampleAt(int index) => At(index);
+        public int LowerBound(DateTimeOffset time) => Bound(time, false);
+        public int UpperBound(DateTimeOffset time) => Bound(time, true);
         private QualifiedValue At(int index) => _items[(_head + index) % capacity];
         private int Bound(DateTimeOffset timestamp, bool upper)
         {
@@ -41,12 +44,13 @@ public sealed partial class Historian : IDisposable
             }
             return low;
         }
-        public QualifiedValue[] Query(DateTimeOffset? start, DateTimeOffset? end, bool includeBounds = false)
+        public QualifiedValue[] Query(DateTimeOffset? start, DateTimeOffset? end, bool includeBounds = false, int maxSamples = 1000000)
         {
             var first = start.HasValue ? Bound(start.Value, false) : 0;
             var last = end.HasValue ? Bound(end.Value, true) : _count;
             if (includeBounds) { first = Math.Max(0, first - 1); last = Math.Min(_count, last + 1); }
             if (last <= first) return [];
+            if (last - first > maxSamples) throw new InvalidOperationException("History window exceeds sample limit; narrow the interval or use aggregation.");
             var result = new QualifiedValue[last - first];
             var offset = (_head + first) % capacity;
             var length = Math.Min(result.Length, capacity - offset);
@@ -86,32 +90,10 @@ public sealed partial class Historian : IDisposable
     public QualifiedValue? Latest(string path) { lock (_gate) return _series.TryGetValue(path, out var ring) ? ring.Last : null; }
     public HistoryBucket[] Aggregate(string path, DateTimeOffset start, DateTimeOffset end, int bucketCount, AggregateKind kind)
     {
-        if (bucketCount is < 1 or > 10000 || end <= start || !Enum.IsDefined(kind)) throw new ArgumentException("Invalid aggregation interval or kind.");
-        var points = Query(path, start, end);
-        var ticks = (end - start).Ticks;
-        var groups = Enumerable.Range(0, bucketCount).Select(_ => new List<QualifiedValue>()).ToArray();
-        foreach (var point in points)
-        {
-            var index = Math.Min(bucketCount - 1, (int)((point.Timestamp - start).Ticks / (double)ticks * bucketCount));
-            groups[index].Add(point);
-        }
-        return groups.Select((group, index) =>
-        {
-            var good = group.Where(p => p.IsGood).ToArray();
-            var numbers = good.Where(p => p.Value.Kind == ScalarKind.Number).Select(p => p.Value.Number).ToArray();
-            var value = kind switch
-            {
-                AggregateKind.Count => Scalar.From(good.Length),
-                AggregateKind.Last when good.Length > 0 => good[^1].Value,
-                AggregateKind.Average when numbers.Length > 0 => Scalar.From(numbers.Average()),
-                AggregateKind.Minimum when numbers.Length > 0 => Scalar.From(numbers.Min()),
-                AggregateKind.Maximum when numbers.Length > 0 => Scalar.From(numbers.Max()),
-                _ => Scalar.Null
-            };
-            var quality = value.Kind == ScalarKind.Null ? Quality.BadNotFound : good.Length == group.Count ? Quality.Good : Quality.Uncertain;
-            return new HistoryBucket(start.AddTicks((long)(ticks * (index / (double)bucketCount))), start.AddTicks((long)(ticks * ((index + 1) / (double)bucketCount))), value, quality, good.Length);
-        }).ToArray();
+        ValidateAggregate(start, end, bucketCount, kind);
+        lock (_gate) return AggregateCore(_series.GetValueOrDefault(path), start, end, bucketCount, kind);
     }
+
     /// <summary>Preserves extrema, endpoints and all quality transitions, which may exceed the nominal pixel budget.</summary>
     public static QualifiedValue[] Decimate(IReadOnlyList<QualifiedValue> points, int pixels)
     {

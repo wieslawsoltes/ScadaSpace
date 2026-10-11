@@ -48,13 +48,14 @@ public sealed partial class Historian
         lock (_gate) return _series.TryGetValue(path, out var ring) ? new(Stamp(ring), ring.First?.Timestamp, ring.Last) : default;
     }
     /// <summary>Atomic owned snapshot. Optional adjacent samples support clipped continuity, not extrapolation.</summary>
-    public HistoryWindow ReadWindow(string path, DateTimeOffset start, DateTimeOffset end, bool includeBounds = false)
+    public HistoryWindow ReadWindow(string path, DateTimeOffset start, DateTimeOffset end, bool includeBounds = false, int maxSamples = 1000000)
     {
+        if (maxSamples is < 1 or > 1000000) throw new ArgumentOutOfRangeException(nameof(maxSamples));
         if (start > end) throw new ArgumentException("Start must not follow end.");
         lock (_gate)
         {
             if (!_series.TryGetValue(path, out var ring)) return new(start, end, default, Array.Empty<QualifiedValue>());
-            return new(start, end, Stamp(ring), Array.AsReadOnly(ring.Query(start, end, includeBounds)));
+            return new(start, end, Stamp(ring), Array.AsReadOnly(ring.Query(start, end, includeBounds, maxSamples)));
         }
     }
 }
@@ -69,7 +70,7 @@ public static class HistoryTrace
         while (low < high) { var mid = low + (high - low) / 2; if (samples[mid].Timestamp <= time) low = mid + 1; else high = mid; }
         if (low == 0) return QualifiedValue.Bad(Quality.BadNotFound, time);
         var a = samples[low - 1];
-        if (a.Timestamp == time) return a; // The last revision wins for a tied timestamp.
+        if (a.Timestamp == time) return a;
         if (low == samples.Count) return QualifiedValue.Bad(Quality.BadNotFound, time);
         var b = samples[low];
         if (!a.IsGood || !b.IsGood) return QualifiedValue.Bad(a.Quality > b.Quality ? a.Quality : b.Quality, time);
