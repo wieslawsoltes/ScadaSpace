@@ -19,6 +19,7 @@ public sealed partial class RuntimeSession
     private readonly List<Diagnostic> _diagnostics = [];
     private int _cursor = -1;
     private bool _notifying;
+    private bool _dispatching;
     public RuntimeSession(ProjectRuntime runtime)
     {
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
@@ -128,12 +129,25 @@ public sealed partial class RuntimeSession
     }
     public void Dispatch(ComponentNode node, string eventName)
     {
-        if (_notifying) throw new InvalidOperationException("Actions cannot be dispatched recursively from session notifications.");
+        if (_notifying || _dispatching) throw new InvalidOperationException("Actions cannot be dispatched recursively.");
         if (!node.Events.TryGetValue(eventName, out var actions)) return;
-        foreach (var action in actions.ToArray())
+        // Own the whole dispatch plan before the first callback. Observers cannot mutate later actions.
+        var plan = EventConfigurations.Snapshot(actions);
+        _dispatching = true;
+        try
         {
-            switch (action.Kind)
+            foreach (var configured in plan)
             {
+                if (!configured.Enabled) continue;
+                ExecuteAction(configured.ToAction());
+            }
+        }
+        finally { _dispatching = false; }
+    }
+    private void ExecuteAction(EventAction action)
+    {
+        switch (action.Kind)
+        {
                 case ActionKind.WriteTag:
                     var write = _runtime.Tags.Write(action.Target, action.Value, Actor);
                     if (!write.Success) throw new InvalidOperationException(write.Message); break;
@@ -163,7 +177,6 @@ public sealed partial class RuntimeSession
                     finally { _notifying = false; }
                     break;
                 default: throw new InvalidOperationException("Unsupported action.");
-            }
         }
     }
     public void ClosePopup(string id) { if (!_notifying && _popups.Remove(id)) Notify(); }
