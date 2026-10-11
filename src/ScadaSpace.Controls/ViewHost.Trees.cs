@@ -11,29 +11,42 @@ public partial class ViewHost
         string? tagRoot = null; Scalar tagItems = Scalar.Null;
         _refresh.Add(() =>
         {
-            Scalar items;
-            if (node.Type == "TagBrowseTree")
+            try
             {
-                var root = Text(node, "root");
-                if (root != tagRoot) { var next = TagTreeBuilder.Build(Runtime!.Tags.Browse(), root); tagItems = next; tagRoot = root; }
-                items = tagItems;
+                Scalar items;
+                if (node.Type == "TagBrowseTree")
+                {
+                    var root = Text(node, "root");
+                    if (root != tagRoot) { var next = TagTreeBuilder.Build(Runtime!.Tags.Browse(), root); tagItems = next; tagRoot = root; }
+                    items = tagItems;
+                }
+                else
+                {
+                    var sample = Read(node, "items");
+                    if (!sample.IsGood) throw new InvalidOperationException("Items quality: " + sample.Quality);
+                    items = sample.Value;
+                }
+                tree.ShowFilter = Flag(node, "showFilter", true); tree.RowHeight = Math.Clamp(Number(node, "rowHeight", 28), 20, 96); tree.MultiSelect = Flag(node, "multiSelect");
+                tree.SetItems(items); tree.Filter = Text(node, "filter");
+                var paths = Value(node, "selectedPaths", Scalar.Array([])); var selection = Value(node, "selection", Scalar.From(""));
+                if (paths != previousPaths || selection != previousSelection)
+                {
+                    var requested = paths != previousPaths && paths.Kind == ScalarKind.Array && paths.Items.Count > 0
+                        ? paths.Items.Select(v => v.Kind == ScalarKind.String ? v.Text! : throw new FormatException("Selected paths must be strings.")).ToArray()
+                        : selection.Kind == ScalarKind.String && selection.Text!.Length > 0 ? [selection.Text!] : Array.Empty<string>();
+                    tree.SelectPaths(requested); previousPaths = paths; previousSelection = selection;
+                }
+                tree.SetDataError(null);
+                tree.IsEnabled = !IsEditing && Flag(node, "enabled", true) && Flag(node, "interactable", true) && Instance!.CanWrite(node, "selection");
+                // Recompute contextual output after data replacement without changing project defaults.
+                if (!IsEditing && Read(node, "selectionData").Value != tree.SelectionData) Instance!.Write(node, "selectionData", tree.SelectionData, Session!.Actor);
             }
-            else items = Value(node, "items", Scalar.Array([]));
-            var quality = node.Type == "Tree" ? Read(node, "items").Quality : Quality.Good;
-            tree.IsEnabled = !IsEditing && quality == Quality.Good && Flag(node, "enabled", true) && Flag(node, "interactable", true) && Instance!.CanWrite(node, "selection");
-            tree.ShowFilter = Flag(node, "showFilter", true); tree.RowHeight = Math.Clamp(Number(node, "rowHeight", 28), 20, 96); tree.MultiSelect = Flag(node, "multiSelect");
-            if (quality == Quality.Good) tree.SetItems(items); else tree.SetItems(Scalar.Array([]));
-            tree.Filter = Text(node, "filter");
-            var paths = Value(node, "selectedPaths", Scalar.Array([])); var selection = Value(node, "selection", Scalar.From(""));
-            if (paths != previousPaths || selection != previousSelection)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException)
             {
-                var requested = paths != previousPaths && paths.Kind == ScalarKind.Array && paths.Items.Count > 0
-                    ? paths.Items.Select(v => v.Kind == ScalarKind.String ? v.Text! : throw new FormatException("Selected paths must be strings.")).ToArray()
-                    : selection.Kind == ScalarKind.String && selection.Text!.Length > 0 ? [selection.Text!] : Array.Empty<string>();
-                tree.SelectPaths(requested); previousPaths = paths; previousSelection = selection;
+                tree.IsEnabled = false;
+                if (tree.DataError != ex.Message) Error?.Invoke(ex.Message);
+                tree.SetDataError(ex.Message);
             }
-            // Recompute contextual output after data replacement, even when selected identities remain the same.
-            if (!IsEditing && Read(node, "selectionData").Value != tree.SelectionData) Instance!.Write(node, "selectionData", tree.SelectionData, Session!.Actor);
         });
         tree.SelectionRequested = change =>
         {

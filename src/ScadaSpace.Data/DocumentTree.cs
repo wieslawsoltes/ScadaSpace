@@ -71,16 +71,18 @@ public sealed class DocumentTreeState
     public DocumentTreeState(DocumentTree tree) => Tree = tree ?? throw new ArgumentNullException(nameof(tree));
     public IReadOnlyList<DocumentTreeItem> Selected => Tree.Items.Where(n => _selection.Contains(n.Key)).ToArray();
     public string CurrentPath => _current is not null && Tree.ByKey.TryGetValue(_current, out var item) ? item.Path : "";
-    public Scalar SelectionData => Scalar.Array(Selected.Select(n => Scalar.Object(new Dictionary<string, Scalar> { ["itemPath"] = n.IndexPath, ["value"] = n.Data })));
+    public Scalar SelectionData { get; private set; } = Scalar.Array([]);
+    private static Scalar SelectionSnapshot(IEnumerable<DocumentTreeItem> items) => Scalar.Array(items.Select(n => Scalar.Object(new Dictionary<string, Scalar> { ["itemPath"] = n.IndexPath, ["value"] = n.Data })));
     public bool IsExpanded(DocumentTreeItem item) => item.Children.Count > 0 && _expansion.GetValueOrDefault(item.Key, item.InitiallyExpanded);
     public void Replace(DocumentTree tree)
     {
         ArgumentNullException.ThrowIfNull(tree);
+        var data = SelectionSnapshot(tree.Items.Where(n => _selection.Contains(n.Key)));
         foreach (var key in _expansion.Keys.ToArray())
             if (!tree.ByKey.TryGetValue(key, out var item) || !Tree.ByKey.TryGetValue(key, out var old) || old.InitiallyExpanded != item.InitiallyExpanded) _expansion.Remove(key);
         _selection.RemoveWhere(key => !tree.ByKey.ContainsKey(key));
-        if (_current is not null && !tree.ByKey.ContainsKey(_current)) _current = null;
-        Tree = tree;
+        if (_current is not null && !tree.ByKey.ContainsKey(_current)) _current = tree.Items.FirstOrDefault(n => _selection.Contains(n.Key))?.Key;
+        Tree = tree; SelectionData = data;
     }
     public void SetExpanded(string path, bool expanded, bool recursive = false)
     {
@@ -98,11 +100,17 @@ public sealed class DocumentTreeState
     public void Select(IEnumerable<string> paths, string? current = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
-        var selected = new HashSet<string>(StringComparer.Ordinal); DocumentTreeItem? last = null;
-        foreach (var path in paths) { last = Tree.Get(path); selected.Add(last.Key); }
+        var selected = new HashSet<string>(StringComparer.Ordinal); DocumentTreeItem? last = null; var count = 0;
+        foreach (var path in paths)
+        {
+            if (++count > DocumentTree.MaximumItems) throw new ArgumentException("Too many selected paths.");
+            last = Tree.Get(path); selected.Add(last.Key);
+        }
         var active = current is null ? last : Tree.Get(current);
         if (active is not null && !selected.Contains(active.Key)) throw new ArgumentException("Current tree item must be selected.");
-        _selection.Clear(); _selection.UnionWith(selected); _current = active?.Key;
+        // Selection output has its own structured-value budget. Validate it before mutating state.
+        var data = SelectionSnapshot(Tree.Items.Where(n => selected.Contains(n.Key)));
+        _selection.Clear(); _selection.UnionWith(selected); _current = active?.Key; SelectionData = data;
     }
     public IReadOnlyList<DocumentTreeRow> Visible(string filter = "")
     {

@@ -66,12 +66,12 @@ public sealed partial class HmiTree : UserControl
     public void SetItems(Scalar items)
     {
         if (_state.Tree.Source == items) return;
-        var tree = new DocumentTree(items); // Validate the complete replacement before changing UI state.
+        var tree = new DocumentTree(items);
         _state.Replace(tree); Rebuild();
     }
     public void SelectPaths(IEnumerable<string> paths, bool reveal = true)
     {
-        var values = paths.ToArray(); if (!MultiSelect && values.Length > 1) throw new ArgumentException("Multiple paths require multiSelect.");
+        var values = paths.Take(DocumentTree.MaximumItems + 1).ToArray(); if (!MultiSelect && values.Length > 1) throw new ArgumentException("Multiple paths require multiSelect.");
         _state.Select(values);
         if (reveal) foreach (var path in values) _state.Reveal(path);
         Rebuild();
@@ -113,13 +113,17 @@ public sealed partial class HmiTree : UserControl
         var items = RowsList.SelectedItems.OfType<TreeRowViewModel>().ToArray();
         var paths = items.Select(r => r.Path).ToArray();
         var current = e.AddedItems.OfType<TreeRowViewModel>().LastOrDefault()?.Path ?? items.LastOrDefault()?.Path ?? "";
-        var previous = _state.Selected.Select(n => n.Path).ToArray(); var oldCurrent = _state.CurrentPath;
-        _state.Select(paths, current.Length == 0 ? null : current);
-        bool accepted;
-        try { accepted = SelectionRequested?.Invoke(new(paths, current, _state.SelectionData)) ?? true; }
-        catch { _state.Select(previous, oldCurrent.Length == 0 ? null : oldCurrent); _sync = true; try { SyncSelection(); } finally { _sync = false; } throw; }
-        if (!accepted) { _state.Select(previous, oldCurrent.Length == 0 ? null : oldCurrent); _sync = true; try { SyncSelection(); } finally { _sync = false; } }
-        StatusText.Text = $"{_rows.Count} visible / {_state.Tree.Items.Count} items · {_state.Selected.Count} selected";
+        var accepted = false;
+        try
+        {
+            // Preflight the immutable payload before notifying a writeback consumer.
+            var candidate = new DocumentTreeState(_state.Tree); candidate.Select(paths, current.Length == 0 ? null : current);
+            accepted = SelectionRequested?.Invoke(new(paths, current, candidate.SelectionData)) ?? true;
+            if (accepted) _state.Select(paths, current.Length == 0 ? null : current);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { SetDataError(ex.Message); }
+        if (!accepted) { _sync = true; try { SyncSelection(); } finally { _sync = false; } }
+        if (DataError is null) StatusText.Text = $"{_rows.Count} visible / {_state.Tree.Items.Count} items · {_state.Selected.Count} selected";
     }
     internal bool HandleTreeKey(KeyRoutedEventArgs e)
     {
