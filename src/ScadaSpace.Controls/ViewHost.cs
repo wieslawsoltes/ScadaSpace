@@ -105,9 +105,9 @@ public partial class ViewHost : Canvas, IDisposable
                 check.Checked += (_, _) => Write(node, "value", Scalar.From(true)); check.Unchecked += (_, _) => Write(node, "value", Scalar.From(false));
                 _refresh.Add(() => { check.IsChecked = Flag(node, "value"); check.Content = Text(node, "text"); check.IsEnabled = Writable(node, "value"); }); element = check; break;
             case "NumericEntry":
-                var number = new NumberBox { FontSize = 13, MinWidth = 0, MinHeight = 0, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
+                var number = new HmiNumericEntry { FontSize = 13, MinWidth = 0, MinHeight = 0 };
                 number.ValueChanged += (_, e) => { if (double.IsFinite(e.NewValue)) Write(node, "value", Scalar.From(e.NewValue)); };
-                _refresh.Add(() => { number.Minimum = Number(node, "minimum"); number.Maximum = Math.Max(number.Minimum, Number(node, "maximum", 100)); number.SmallChange = Math.Max(.001, Number(node, "step", 1)); if (number.FocusState == FocusState.Unfocused) number.Value = Number(node, "value"); number.IsEnabled = Writable(node, "value"); }); element = number; break;
+                _refresh.Add(() => { number.Minimum = Number(node, "minimum"); number.Maximum = Math.Max(number.Minimum, Number(node, "maximum", 100)); number.SmallChange = Math.Max(.001, Number(node, "step", 1)); if (!number.HasEditFocus) number.Value = Number(node, "value"); number.IsEnabled = Writable(node, "value"); }); element = number; break;
             case "TextField":
                 var text = new TextBox { FontSize = 13, MinWidth = 0, MinHeight = 0, Padding = new Thickness(6, 3, 6, 3) };
                 text.LostFocus += (_, _) => Write(node, "text", Scalar.From(text.Text));
