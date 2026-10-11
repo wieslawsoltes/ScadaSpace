@@ -19,6 +19,7 @@ public sealed partial class RuntimeSession
     private readonly List<Diagnostic> _diagnostics = [];
     private int _cursor = -1;
     private bool _notifying;
+    private bool _dispatching;
     public RuntimeSession(ProjectRuntime runtime)
     {
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
@@ -128,12 +129,25 @@ public sealed partial class RuntimeSession
     }
     public void Dispatch(ComponentNode node, string eventName)
     {
-        if (_notifying) throw new InvalidOperationException("Actions cannot be dispatched recursively from session notifications.");
+        if (_notifying || _dispatching) throw new InvalidOperationException("Actions cannot be dispatched recursively.");
         if (!node.Events.TryGetValue(eventName, out var actions)) return;
-        foreach (var action in actions.ToArray())
+        // Own the whole dispatch plan before the first callback. Observers cannot mutate later actions.
+        var plan = EventConfigurations.Snapshot(actions);
+        _dispatching = true;
+        try
         {
-            switch (action.Kind)
+            foreach (var configured in plan)
             {
+                if (!configured.Enabled) continue;
+                ExecuteAction(configured);
+            }
+        }
+        finally { _dispatching = false; }
+    }
+    private void ExecuteAction(ActionConfiguration action)
+    {
+        switch (action.Kind)
+        {
                 case ActionKind.WriteTag:
                     var write = _runtime.Tags.Write(action.Target, action.Value, Actor);
                     if (!write.Success) throw new InvalidOperationException(write.Message); break;
@@ -143,27 +157,26 @@ public sealed partial class RuntimeSession
                     var toggle = _runtime.Tags.Write(action.Target, Scalar.From(!old.Value.Boolean), Actor, old.Revision);
                     if (!toggle.Success) throw new InvalidOperationException(toggle.Message); break;
                 case ActionKind.Navigate:
-                    if (!Navigate(action.Target, action.Parameters)) throw new InvalidOperationException(LastError); break;
+                    if (!Navigate(action.Target, action.Parameters.Fields)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.NavigateBack: Back(); break;
                 case ActionKind.NavigateForward: Forward(); break;
                 case ActionKind.OpenDock:
-                    if (!OpenDock(action.Target, action.Parameters)) throw new InvalidOperationException(LastError); break;
+                    if (!OpenDock(action.Target, action.Parameters.Fields)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.CloseDock:
                     if (!CloseDock(action.Target)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.ToggleDock:
                     if (!ToggleDock(action.Target)) throw new InvalidOperationException(LastError); break;
                 case ActionKind.OpenPopup:
                     if ((!_popups.ContainsKey(action.Target) && _popups.Count >= 16) || !_runtime.Project.Views.Any(x => x.Path == action.Target)) throw new InvalidOperationException("Unknown popup view or popup limit reached.");
-                    _popups[action.Target] = new(action.Target, action.Target, Snapshot(action.Parameters)); Notify(); break;
+                    _popups[action.Target] = new(action.Target, action.Target, Snapshot(action.Parameters.Fields)); Notify(); break;
                 case ActionKind.ClosePopup: ClosePopup(action.Target); break;
                 case ActionKind.SendMessage:
-                    var message = new SessionMessage(action.Target, Snapshot(action.Parameters));
+                    var message = new SessionMessage(action.Target, Snapshot(action.Parameters.Fields));
                     _notifying = true;
                     try { if (Message is { } handlers) foreach (Action<SessionMessage> observer in handlers.GetInvocationList()) Observe(() => observer(message)); }
                     finally { _notifying = false; }
                     break;
                 default: throw new InvalidOperationException("Unsupported action.");
-            }
         }
     }
     public void ClosePopup(string id) { if (!_notifying && _popups.Remove(id)) Notify(); }

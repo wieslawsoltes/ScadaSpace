@@ -83,6 +83,28 @@ reports.Add(activation);
 if (!ReferenceEquals(openSnapshot, workspace.OpenViews) || workspace.Revision != workspaceRevision || activation.BytesPerOperation != 0)
     throw new Exception("Already-active resources must retain their snapshot without allocation.");
 
+var configurationDocument = new DesignerDocument(DemoProject.Create());
+var configurationIndex = new ConfigurationIndex(); configurationIndex.Refresh(configurationDocument);
+var configurationRows = configurationIndex.Query("Tank");
+int RebuildConfiguration()
+{
+    var index = new ConfigurationIndex(); index.Refresh(configurationDocument); return index.Query("Tank").Count;
+}
+if (RebuildConfiguration() != configurationRows.Count) throw new Exception("Configuration query reference differs.");
+reports.Add(Measure("configuration_inventory_rebuild", 100, RebuildConfiguration));
+var cachedConfiguration = Measure("configuration_inventory_cached", 1000, () => { configurationIndex.Refresh(configurationDocument); return configurationIndex.Query("Tank").Count; });
+reports.Add(cachedConfiguration);
+if (configurationIndex.BuildCount != 1 || configurationIndex.QueryBuildCount != 1 || cachedConfiguration.BytesPerOperation != 0)
+    throw new Exception("Idle configuration lookup must retain its inventory and query without allocation.");
+
+var eventDraft = new EventConfigurationDraft(configurationDocument, configurationDocument.Project.Views[0].Root.Id);
+eventDraft.Add("onClick", new(ActionKind.WriteTag, "[default]Plant/Tank01/Setpoint", Scalar.From(45), Scalar.Object([])));
+var eventNames = eventDraft.EventNames; var eventActions = eventDraft.Actions("onClick");
+var draftLookup = Measure("event_draft_cached_snapshots", 1000, () => eventDraft.EventNames.Count + eventDraft.Actions("onClick").Count);
+reports.Add(draftLookup);
+if (draftLookup.BytesPerOperation != 0 || !ReferenceEquals(eventNames, eventDraft.EventNames) || !ReferenceEquals(eventActions, eventDraft.Actions("onClick")))
+    throw new Exception("Idle event editor reads must not allocate wrappers or rebuild supported event names.");
+
 Directory.CreateDirectory("TestResults");
 File.WriteAllText("TestResults/performance.json", JsonSerializer.Serialize(new {
     runtime = RuntimeInformation.FrameworkDescription, os = RuntimeInformation.OSDescription,

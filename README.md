@@ -84,6 +84,10 @@ The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virt
 
 The workspace uses compact vector toolbar commands, bottom resource tabs, a full-height Property Editor and an auto-hidden/pinnable Components palette. Pane visibility, widths and palette display mode are saved locally; closing resource tabs retains all project edits. Searchable Project Browser nodes, palette buttons and unchanged tabs are reused. See [workspace behavior, reusable APIs and review](docs/designer-workspace.md).
 
+## Event configuration and references
+
+**Component → Configure Events…** and the canvas context menu open a native event/action/settings editor. Add, reorder, duplicate, disable and validate existing local actions; Apply/OK/Cancel work with transactional undo/redo. **Configuration Explorer** searches bindings, transforms, events, actions and embedded-view references and selects their owning component. Generation-indexed search results and retained control maps avoid rebuilding unchanged inventories. See [configuration workflows, runtime hardening and boundaries](docs/configuration-workflows.md).
+
 ## Local Tag History bindings
 
 `TagHistory` bindings expose the in-memory historian as read-only typed table data, with fixed or latest-sample-relative windows, expression-driven time/row options, explicit sample aggregates and shared bounded query caching. Failed data/column configurations clear old table rows and show a recoverable diagnostic. Reusable atomic history snapshots, quality-aware trace and viewport state APIs are also available; the existing chart UI is unchanged. See [history binding configuration and review](docs/history-bindings.md) for examples, tests and limits.

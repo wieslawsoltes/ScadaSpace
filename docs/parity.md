@@ -18,7 +18,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 | Charts | Live qualified history, time-window zoom, crosshair, time-series/bar/pie, extrema decimation | No complete Power Chart, pen management, range brush or chart annotation parity |
 | Alarms | States, hysteresis, delays, acknowledgement, timed shelving, status/journal tables | No alarm pipelines, email/SMS/voice notifications, remote journal database or full Perspective alarm filtering/actions |
 | History | Bounded memory storage, atomic UTC snapshots, streaming sample aggregates, cached tall document queries, quality-aware trace, CSV export | No SQL historian, store-and-forward, compression tiers, time-weighted interpolation or durable recovery |
-| Events | Declarative write/toggle/navigate/popup/message actions | No Jython or arbitrary scripting, no entire system scripting API |
+| Events | Native three-pane staged event/action editor, ordered enabled actions, native click/double-click/context and button activation hooks, immutable dispatch plans, searchable configuration references | No Jython, asynchronous script actions, full event payload/propagation/security semantics or entire system scripting API |
 | Sessions | Parameterized routes, separate query context, typed URL construction, bounded back/forward snapshots, hash deep links, shared/local docked views, push/cover/auto modes, resizing, page configuration editor, existing simple popups and isolated session launch | No shared multi-user Gateway, session authentication, full page-property writeability, same-edge multi-dock definitions, CSS/animation parity, or configurable popup-window parity |
 | Graphics | Independent Skia vector drawing integrated through Uno SKCanvasElement | Backend selected by Uno; not a custom WebGPU backend; no measured physical-GPU performance claim |
 | Packaging | Twelve separate engine/data/graphics/Uno library projects; NuGet pack pipeline | Packages are build artifacts, not published to nuget.org |
@@ -27,7 +27,9 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 ## Verification scope
 
-The deterministic suites contain 37 original engine checks, 10 hardening checks, 41 structured-value/binding/table checks, 28 page-navigation/dock/query checks and 26 hierarchical tree checks. Fifteen adapter tests execute the browser history script. Browser suites drive the actual Uno controls, including regression checks for navigation with prior selection, property writeback, table editing, reactive repeaters, page configuration, docked sessions, Unicode reloads, decoded drawing typefaces and tree input/virtualization. Test results apply only to the exact revision and scenarios in the accompanying Actions artifacts. See [validation](validation.md).
+Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Seven browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace and event configuration. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
+
+Counts and pass/fail claims apply only to the exact revision in the corresponding Actions artifacts. Build success alone is not runtime evidence. See [validation](validation.md), [configuration workflows](configuration-workflows.md), and the retained source, reports and screenshots for executed scope.
 
 ## Public references
 

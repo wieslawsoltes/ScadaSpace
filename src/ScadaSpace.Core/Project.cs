@@ -175,6 +175,8 @@ public static partial class ProjectCodec
                 foreach (var t in binding.Transforms)
                     if (t is null || !Enum.IsDefined(t.Kind) || t.Map is null || t.Expression is null || t.Format is null || !Finite(t.InputMin) || !Finite(t.InputMax) || !Finite(t.OutputMin) || !Finite(t.OutputMax)) Error("Invalid transform.", path);
             }
+            try { EventConfigurations.Validate(node.Events); }
+            catch (ArgumentException ex) { Error(ex.Message, path + "/events"); }
             foreach (var child in node.Children) Node(child, path + "/" + child?.Name, depth + 1);
         }
         foreach (var view in project.Views)
