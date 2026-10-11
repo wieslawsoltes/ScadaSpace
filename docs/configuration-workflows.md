@@ -28,6 +28,8 @@ Local actions are synchronous and ordered. This is deliberately documented rathe
 
 `ConfigurationIndex` rebuilds only when the owning `DesignerDocument` or its generation changes. The index stores immutable reference records rather than mutable component objects. Repeating an unchanged filter reuses the same result collection without traversing the document. The 25,000-entry bound fails explicitly rather than silently omitting configurations. All designer definition mutations must use the document transaction API to participate in generation tracking.
 
+Project action validation checks parameter node/depth totals without allocating a discarded immutable copy. Dispatch executes its already-owned records directly rather than converting them back into mutable actions. The inventory cache-hit path is separated from the closure-bearing tree scan. These changes retain the same limits and fail-before-dispatch contract.
+
 Palette and resource-tab observation maps are retained read-only views instead of newly allocated dictionaries on every telemetry refresh. Unconfigured generic mouse handlers are not attached to every HMI control. New performance checks compare rebuilding and caching the same configuration query; elapsed times are observational and allocation/result-equivalence invariants are the CI gates.
 
 ## Validation and scope
