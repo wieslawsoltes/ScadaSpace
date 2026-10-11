@@ -70,7 +70,16 @@ with sync_playwright() as p:
     def command(name): click(app()["controls"][name]); page.wait_for_timeout(350)
     def dock(name): return next(d for d in app()["page"]["docks"] if d["id"] == name)
     def component(name, owner=None): return dock(owner)["components"][name] if owner else app()["components"][name]
-    def press(name, owner=None): click(component(name, owner)["bounds"]); page.wait_for_timeout(450)
+    def press(name, owner=None):
+        # Navigation updates the model before native layout. Wait for actual geometry,
+        # not an assumed delay, while preserving the test's real pointer input.
+        page.wait_for_function("""({name, owner}) => {
+            const app = window.scadaApp;
+            const components = owner ? app?.page?.docks.find(d => d.id === owner)?.components : app?.components;
+            const bounds = components?.[name]?.bounds;
+            return bounds?.width > 0 && bounds?.height > 0;
+        }""", arg={"name": name, "owner": owner}, timeout=30000)
+        click(component(name, owner)["bounds"]); page.wait_for_timeout(450)
     def fill(bounds, text):
         click(bounds); page.keyboard.press("Control+a"); page.keyboard.insert_text(str(text))
     def check(name, ok):
