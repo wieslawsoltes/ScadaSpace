@@ -92,7 +92,7 @@ public sealed partial class WorkbenchPage
             configurationExplorer = _configurationExplorer is null ? null : new { fields = _configurationExplorer.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), count = _configurationExplorer.Rows.Count, selected = _configurationExplorer.Selected, kindMenu = ConfigurationKindMenu(), builds = _configurationIndex.BuildCount, queries = _configurationIndex.QueryBuildCount },
             page = PageTelemetry(Bounds),
             pageEditor = _pageEditor?.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
-            ready = true, project = _document.Project.Name, view = _view, preview = _preview, sessionMode = _sessionMode,
+            ready = ObserveNativeReadiness(), project = _document.Project.Name, view = _view, preview = _preview, sessionMode = _sessionMode,
             dirty = _document.IsDirty, generation = _document.Generation, canUndo = _document.CanUndo, canRedo = _document.CanRedo,
             zoom = _surface.Zoom, selection = _document.Selection.Select(id => _document.Find(id)?.Name).ToArray(),
             tags = _runtime.Tags.Snapshot(), alarms = _runtime.Alarms.Status(), journalCount = _runtime.Alarms.Journal().Length,

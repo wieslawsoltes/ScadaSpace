@@ -17,3 +17,9 @@ The symbol fixture captured its idle-cache baseline after the Preview flag chang
 View observations add one read-only `editing` field, obtained from the actual ViewHost. No command/property setter is exposed. The product's renderer, input routing, symbol caches, layout and file-import implementation are unchanged by this test-readiness follow-up. The two-worker concurrency bound, timeout/failure handling and all eleven suites remain enabled. There are no blind retries, dropped assertions or swallowed errors.
 
 The final-head PR gate and the subsequent main gate must both pass. An earlier successful PR run is not sufficient to claim the main build has deployed. Exact counts, source identity and public revision belong to the matching Actions artifacts.
+
+## Shared startup readiness
+
+The first follow-up run passed the three repaired suites, but the same initial toolbar-coordinate problem appeared in the events suite. Its failure screenshot again shows Page Configuration instead of the requested file picker. This confirmed that startup readiness needed a shared observation contract rather than only per-test targeting changes.
+
+The workbench previously published `ready = true` as soon as it had a model and positive page dimensions. It now publishes ready only after the actual view is loaded, key toolbar bounds and page size remain unchanged over three distinct native timer ticks, and a visible custom symbol has completed a drawing or diagnostic when such symbols exist. Text-only views use the stable native layout condition. The readiness decision is latched after startup, so it adds no ongoing traversal cost. It never delays or changes product commands, fonts, layout or rendering; it corrects the passive readiness signal used by all eleven suites. The DOM ready attribute now mirrors that signal rather than always reporting true. Later view transitions and responsive resizes still use their own explicit readiness checks.
