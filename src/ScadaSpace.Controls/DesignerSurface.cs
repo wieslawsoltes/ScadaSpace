@@ -23,6 +23,8 @@ public partial class DesignerSurface : Grid, IDisposable
     private readonly Grid _board = new();
     private readonly Grid _layers = new();
     private readonly DesignAdorner _adorner = new();
+    private readonly LayoutSnapshotCache _layoutCache = new();
+    public long LayoutBuildCount => _layoutCache.BuildCount;
     private readonly Ruler _horizontal = new();
     private readonly Ruler _vertical = new() { Vertical = true };
     private Point? _start;
@@ -43,6 +45,7 @@ public partial class DesignerSurface : Grid, IDisposable
     public DesignerSurface()
     {
         Background = ControlTheme.Brush("#CCD3D8");
+        _adorner.SlotsProvider = Slots;
         _board.RowDefinitions.Add(new() { Height = new GridLength(20) }); _board.RowDefinitions.Add(new());
         _board.ColumnDefinitions.Add(new() { Width = new GridLength(20) }); _board.ColumnDefinitions.Add(new());
         _board.Children.Add(new Border { Background = ControlTheme.Brush("#DEE4E8") });
@@ -100,11 +103,14 @@ public partial class DesignerSurface : Grid, IDisposable
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { Status?.Invoke(ex.Message); }
     }
-    private IReadOnlyList<LayoutSlot> Slots() => Host.Instance is { } instance ? LayoutEngine.Flatten(instance.View.Root, instance.View.Width, instance.View.Height) : [];
+    private IReadOnlyList<LayoutSlot> Slots() => Host.Instance is { } instance
+        ? _layoutCache.Get(instance.View.Root, instance.View.Width, instance.View.Height, Document?.Generation ?? 0) : Array.Empty<LayoutSlot>();
     private LayoutSlot? Hit(Point point)
     {
-        foreach (var slot in Slots().Reverse())
+        var slots = Slots();
+        for (var i = slots.Count - 1; i >= 0; i--)
         {
+            var slot = slots[i];
             var radians = -slot.Node.Rotation * Math.PI / 180; var cx = slot.Bounds.X + slot.Bounds.Width / 2; var cy = slot.Bounds.Y + slot.Bounds.Height / 2;
             var x = cx + (point.X - cx) * Math.Cos(radians) - (point.Y - cy) * Math.Sin(radians);
             var y = cy + (point.X - cx) * Math.Sin(radians) + (point.Y - cy) * Math.Cos(radians);
@@ -167,7 +173,11 @@ public partial class DesignerSurface : Grid, IDisposable
     }
     private static RectD Normalize(Point a, Point b) => new(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
     private void CancelDrag() { _start = null; _resize = _marquee = false; _adorner.Delta = default; _adorner.Resizing = false; _adorner.Marquee = null; _adorner.Invalidate(); }
-    public void Dispose() => Host.Dispose();
+    public void Dispose()
+    {
+        CancelDrag(); Host.Dispose(); _layoutCache.Clear();
+        _adorner.Root = null; _adorner.Document = null; Document = null;
+    }
 
     private partial class Ruler : SKCanvasElement
     {
@@ -186,6 +196,7 @@ public partial class DesignerSurface : Grid, IDisposable
     }
     private partial class DesignAdorner : SKCanvasElement
     {
+        public Func<IReadOnlyList<LayoutSlot>>? SlotsProvider { get; set; }
         public DesignerDocument? Document { get; set; }
         public ComponentNode? Root { get; set; }
         public Point Delta { get; set; }
@@ -197,9 +208,10 @@ public partial class DesignerSurface : Grid, IDisposable
             if (Document is null || Root is null) return;
             using var p = new CanvasPainter(canvas);
             if (ShowGrid) for (var y = 0; y < area.Height; y += 16) for (var x = 0; x < area.Width; x += 16) p.Circle(x, y, .75f, SKColor.Parse("#91A4AD").WithAlpha(75));
-            var slots = LayoutEngine.Flatten(Root, area.Width, area.Height);
-            foreach (var slot in slots.Where(s => Document.Selection.Contains(s.Node.Id)))
+            var slots = SlotsProvider?.Invoke() ?? Array.Empty<LayoutSlot>();
+            foreach (var slot in slots)
             {
+                if (!Document.Selection.Contains(slot.Node.Id)) continue;
                 var b = slot.Bounds;
                 var color = SKColor.Parse(slot.Node.Locked ? "#8A9398" : "#069CCC");
                 canvas.Save();

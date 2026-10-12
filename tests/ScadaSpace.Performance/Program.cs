@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using ScadaSpace.Core;
 using ScadaSpace.Designer;
+using ScadaSpace.Layout;
 using ScadaSpace.Data;
 using ScadaSpace.History;
 using ScadaSpace.Runtime;
@@ -104,6 +105,24 @@ var draftLookup = Measure("event_draft_cached_snapshots", 1000, () => eventDraft
 reports.Add(draftLookup);
 if (draftLookup.BytesPerOperation != 0 || !ReferenceEquals(eventNames, eventDraft.EventNames) || !ReferenceEquals(eventActions, eventDraft.Actions("onClick")))
     throw new Exception("Idle event editor reads must not allocate wrappers or rebuild supported event names.");
+
+var largeRoot = new ComponentNode { Type = "Container", Name = "root", Width = 2000, Height = 2000 };
+for (var i = 0; i < 2000; i++) largeRoot.Children.Add(new() { Id = "item" + i, X = i % 40 * 45, Y = i / 40 * 35, Width = 40, Height = 30 });
+var largeDocument = new DesignerDocument(new() { Views = [new() { Path = "Large", Width = 2000, Height = 2000, Root = largeRoot }] });
+largeRoot = largeDocument.Project.Views[0].Root;
+ComponentNode? ScanNode() => largeDocument.Project.Views.SelectMany(v => v.Root.DescendantsAndSelf()).FirstOrDefault(n => n.Id == "item1999");
+if (!ReferenceEquals(ScanNode(), largeDocument.Find("item1999"))) throw new Exception("Indexed node lookup differs from the original scan.");
+reports.Add(Measure("designer_node_scan_2000", 100, () => ScanNode() is not null ? 1 : 0));
+var nodeBuilds = largeDocument.HierarchyBuildCount;
+var nodeLookup = Measure("designer_node_index_2000", 1000, () => largeDocument.Find("item1999") is not null ? 1 : 0);
+reports.Add(nodeLookup);
+if (nodeLookup.BytesPerOperation != 0 || largeDocument.HierarchyBuildCount != nodeBuilds) throw new Exception("Idle hierarchy lookup rebuilt or allocated.");
+var layoutCache = new LayoutSnapshotCache(); var layout = layoutCache.Get(largeRoot, 2000, 2000, largeDocument.Generation);
+if (!layout.SequenceEqual(LayoutEngine.Flatten(largeRoot, 2000, 2000))) throw new Exception("Cached layout differs from reference geometry.");
+reports.Add(Measure("designer_layout_flatten_2000", 100, () => LayoutEngine.Flatten(largeRoot, 2000, 2000).Count));
+var cachedLayout = Measure("designer_layout_cached_2000", 1000, () => layoutCache.Get(largeRoot, 2000, 2000, largeDocument.Generation).Count);
+reports.Add(cachedLayout);
+if (cachedLayout.BytesPerOperation != 0 || layoutCache.BuildCount != 1) throw new Exception("Idle designer layout was rebuilt or allocated.");
 
 Directory.CreateDirectory("TestResults");
 File.WriteAllText("TestResults/performance.json", JsonSerializer.Serialize(new {

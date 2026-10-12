@@ -53,6 +53,12 @@ var draft = new EventConfigurationDraft(document,component.Id);
 draft.Add("onClick",new ActionConfiguration(ActionKind.WriteTag,"[default]Plant/Tank01/Setpoint",Scalar.From(45),Scalar.Object([])));
 draft.Apply(document);
 Check(document.IsDirty && component.Events["onClick"].Count == 1, "packaged event draft commits a detached component edit");
+var rootChild = component.Children.First();
+var oldId = rootChild.Id; document.Select(oldId);
+var wrapperId = document.WrapSelectionInCoordinateContainer();
+Check(document.FindParent(oldId)?.Id == wrapperId && document.FindView(oldId)?.Path == document.Project.Views[0].Path, "packaged wrapping retains identity and indexed parent/view membership");
+document.Undo();
+Check(document.FindParent(oldId)?.Id == component.Id, "packaged wrapping undo restores the original parent");
 var configurations = new ConfigurationIndex(); configurations.Refresh(document);
 var actionRows = configurations.Query("onClick",ConfigurationKind.Action);
 Check(actionRows.Count == 1 && ReferenceEquals(actionRows,configurations.Query("onClick",ConfigurationKind.Action)), "packaged configuration index reuses owned query snapshots");
@@ -75,8 +81,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 10:
-            raise RuntimeError(f"Expected ten executed package checks; got {count}")
+        if count != 12:
+            raise RuntimeError(f"Expected twelve executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):

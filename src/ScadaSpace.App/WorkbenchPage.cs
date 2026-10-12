@@ -85,7 +85,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         };
         Unloaded += (_, _) => { _timer.Stop(); FlushPanelPreferences(); };
     }
-    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); }
+    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); InitializeHierarchyCommands(); }
     private void AddMenu(MenuBar menu, string title, params (string Text, Action Action)[] items)
     {
         var group = new MenuBarItem { Title = title, FontSize = 12, MinHeight = 0, Padding = new Thickness(6, 0, 6, 0) };
@@ -101,7 +101,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     private void InstallProject(ProjectDefinition project)
     {
         _loading = true;
-        if (_document is not null) _document.Changed -= DocumentChanged;
+        if (_document is not null) { _document.Changed -= DocumentChanged; _document.Restored -= DocumentChanged; }
         if (_session is not null) { _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated; }
         _pageHost.Dispose(); _surface.Dispose(); _runtime?.Dispose();
         _document = new(project); _runtime = new(_document.Project); _simulator = new(_runtime.Tags); _session = new(_runtime);
@@ -112,7 +112,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
             if (_session.Current is { } current) { _view = current.Page.View; BrowserServices.PublishPageNavigation(new(current, NavigationKind.Replace), project.Name); }
         }
         _session.Changed += SessionChanged; _session.Navigated += PageNavigated;
-        _document.Changed += DocumentChanged;
+        _document.Changed += DocumentChanged; _document.Restored += DocumentChanged;
         if (!_document.Project.Views.Any(v => v.Path == _view)) _view = _document.Project.Pages.FirstOrDefault()?.View ?? _document.Project.Views[0].Path;
         _resources.Reset(_document.Project.Views.Select(v => v.Path), _view);
         _tagDefinitions = _runtime.Tags.Browse(); _componentCount = _document.Project.Views.Sum(v => v.Root.DescendantsAndSelf().Count());
@@ -175,7 +175,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     private void UpdateButtons()
     {
         if (_document is null) return;
-        UpdateSessionBar(); UpdateConfigurationCommands();
+        UpdateSessionBar(); UpdateConfigurationCommands(); UpdateHierarchyCommands();
         ((Button)_commands["page-configuration"]).IsEnabled = !_preview;
         _title.Text = _document.Project.Name + (_document.IsDirty ? " *" : "") + "  —  ScadaSpace";
         ((Button)_commands["undo"]).IsEnabled = !_preview && _document.CanUndo; ((Button)_commands["redo"]).IsEnabled = !_preview && _document.CanRedo;

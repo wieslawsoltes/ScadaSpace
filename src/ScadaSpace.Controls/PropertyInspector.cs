@@ -18,6 +18,9 @@ public partial class PropertyInspector : Grid
     private DesignerDocument? _document;
     private ViewHost? _host;
     private string? _id;
+    private long _inspectionVersion;
+    private readonly Dictionary<string, FrameworkElement> _editorFields = new(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, FrameworkElement> EditorFields => _editorFields;
     public event Action<string>? Error;
     public PropertyInspector()
     {
@@ -28,7 +31,8 @@ public partial class PropertyInspector : Grid
     }
     public void Inspect(DesignerDocument document, string? id, ViewHost host)
     {
-        _document = document; _host = host; _id = id; _fields.Children.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
+        _inspectionVersion++;
+        _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
         var node = id is null ? null : document.Find(id);
         if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); return; }
         _heading.Text = node.Name + "  ·  " + node.Type;
@@ -85,10 +89,12 @@ public partial class PropertyInspector : Grid
         row.ColumnDefinitions.Add(new() { Width = new GridLength(88) }); row.ColumnDefinitions.Add(new()); row.ColumnDefinitions.Add(new() { Width = new GridLength(binding is null ? 0 : 27) });
         var label = ControlTheme.Text(name, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label);
         var box = new TextBox { Text = text, FontSize = 11, MinHeight = 27, MinWidth = 0, Padding = new Thickness(4, 2, 4, 2), BorderThickness = new Thickness(0, 0, 0, 1), BorderBrush = ControlTheme.Brush("#E4E8EB"), Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF"), IsReadOnly = bound };
+        _editorFields[name] = box;
         var original = text;
+        var owner = _document; var componentId = _id; var generation = owner?.Generation; var inspection = _inspectionVersion;
         void Apply()
         {
-            if (bound || box.Text == original) return;
+            if (bound || box.Text == original || _inspectionVersion != inspection || !ReferenceEquals(_document, owner) || _id != componentId || owner?.Generation != generation) return;
             try { commit(box.Text); original = box.Text; _message.Text = ""; }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException) { _message.Text = ex.Message; box.Text = original; Error?.Invoke(ex.Message); }
         }

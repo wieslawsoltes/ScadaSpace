@@ -10,7 +10,8 @@ public sealed partial class DesignerDocument
     private readonly List<Diagnostic> _restoreDiagnostics = [];
     /// <summary>Raised after rollback replaces project objects. Consumers must rebind even though Generation is unchanged.</summary>
     public event Action? Restored;
-    public IReadOnlyList<Diagnostic> RestoreDiagnostics => _restoreDiagnostics.AsReadOnly();
+    private IReadOnlyList<Diagnostic>? _restoreView;
+    public IReadOnlyList<Diagnostic> RestoreDiagnostics => _restoreView ??= _restoreDiagnostics.AsReadOnly();
     private void NotifyRestored()
     {
         if (Restored is not { } handlers) return;
@@ -26,9 +27,9 @@ public sealed partial class DesignerDocument
 
     // Definitions remain mutable. Execute invalidates before and after each mutation,
     // including rollback; lookups inside a transaction never trust an earlier index.
-    private Dictionary<string, NodeLocation> NodeIndex()
+    private Dictionary<string, NodeLocation> NodeIndex() => !_editing && _nodeIndex is not null ? _nodeIndex : BuildNodeIndex();
+    private Dictionary<string, NodeLocation> BuildNodeIndex()
     {
-        if (!_editing && _nodeIndex is not null) return _nodeIndex;
         var next = new Dictionary<string, NodeLocation>(StringComparer.Ordinal);
         void Add(ComponentNode node, ComponentNode? parent, ViewDefinition view, int depth)
         {
