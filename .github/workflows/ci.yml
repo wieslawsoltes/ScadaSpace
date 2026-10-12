@@ -30,6 +30,7 @@ jobs:
           dotnet run --project tests/ScadaSpace.Hardening.Tests -c Release
           dotnet run --project tests/ScadaSpace.Parity.Tests -c Release
           dotnet run --project tests/ScadaSpace.Performance -c Release
+          dotnet run --project tests/ScadaSpace.Graphics.Tests -c Release
           node --test --test-reporter=tap tests/browser/navigation-adapter.test.cjs > TestResults/navigation-adapter.tap
       - name: Pack reusable engine libraries
         run: |
