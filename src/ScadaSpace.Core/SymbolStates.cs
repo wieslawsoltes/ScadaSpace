@@ -14,7 +14,6 @@ public sealed record SymbolStateStyle(string PrimaryColor = "#F4F4F4", string Se
     }
 }
 
-/// <summary>Owned family assignments and original theme values for Reset Theme.</summary>
 public sealed class SymbolStateDefinition
 {
     public SymbolStateStyle Light { get; }
@@ -47,7 +46,7 @@ public sealed class SymbolStateDefinition
         && InitialLight == other.InitialLight && InitialDark == other.InitialDark && Symbols.SequenceEqual(other.Symbols);
 }
 
-/// <summary>Immutable project catalog; stored entries override immutable built-ins.</summary>
+/// <summary>Immutable, canonical project overrides. Unchanged built-ins are never serialized as redundant overrides.</summary>
 public sealed class SymbolStateCatalog
 {
     public const int MaximumOverrides = 128;
@@ -65,9 +64,12 @@ public sealed class SymbolStateCatalog
         foreach (var (name, state) in states)
         {
             ValidateName(name); ArgumentNullException.ThrowIfNull(state);
-            // Built-in reset baselines are defined by the product, not caller-supplied overrides.
-            owned.Add(name, BuiltIns.TryGetValue(name, out var builtin)
-                ? new(state.Light, state.Dark, state.Symbols, builtin.InitialLight, builtin.InitialDark) : state);
+            if (BuiltIns.TryGetValue(name, out var builtin))
+            {
+                var normalized = new SymbolStateDefinition(state.Light, state.Dark, state.Symbols, builtin.InitialLight, builtin.InitialDark);
+                if (!normalized.Equivalent(builtin)) owned.Add(name, normalized);
+            }
+            else owned.Add(name, state);
         }
         States = new ReadOnlyDictionary<string, SymbolStateDefinition>(owned);
         Names = Array.AsReadOnly(BuiltIns.Keys.Concat(owned.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
@@ -85,16 +87,15 @@ public sealed class SymbolStateCatalog
         : BuiltIns.TryGetValue(name, out var builtin) ? builtin : throw new ArgumentException("Unknown symbol state: " + name);
     public SymbolStateStyle Resolve(string family, string name, string theme)
     {
-        ValidateTheme(theme);
-        if (!IsFamily(family)) throw new ArgumentException("Unknown symbol family: " + family);
-        var state = Get(name);
-        if (!state.AppliesTo(family)) throw new ArgumentException("State " + name + " is not applied to " + family + ".");
+        ValidateTheme(theme); if (!IsFamily(family)) throw new ArgumentException("Unknown symbol family: " + family);
+        var state = Get(name); if (!state.AppliesTo(family)) throw new ArgumentException("State " + name + " is not applied to " + family + ".");
         return theme == "light" ? state.Light : state.Dark;
     }
     public SymbolStateCatalog With(string name, SymbolStateDefinition value)
     {
         ValidateName(name); ArgumentNullException.ThrowIfNull(value);
-        if (States.TryGetValue(name, out var old) && old.Equivalent(value)) return this;
+        var previous = States.GetValueOrDefault(name) ?? BuiltIns.GetValueOrDefault(name);
+        if (previous?.Equivalent(value) == true) return this;
         var next = new Dictionary<string, SymbolStateDefinition>(States, StringComparer.Ordinal) { [name] = value }; return new(next);
     }
     public SymbolStateCatalog WithoutCustom(string name)
@@ -129,6 +130,5 @@ public sealed class SymbolStateCatalog
 public sealed partial class ProjectDefinition
 {
     private SymbolStateCatalog _symbolStates = SymbolStateCatalog.Empty;
-    /// <summary>Absent in older projects means built-in defaults; null is rejected before publication.</summary>
     public SymbolStateCatalog SymbolStates { get => _symbolStates; set { ArgumentNullException.ThrowIfNull(value); _symbolStates = value; } }
 }
