@@ -13,7 +13,8 @@ internal static partial class BrowserServices
         kind = symbol.Kind, value = symbol.Value, minimum = symbol.Minimum, maximum = symbol.Maximum,
         quality = symbol.Quality, options = symbol.Data.Options, tank = symbol.Data.Tank,
         dataError = symbol.DataError, renderError = symbol.RenderError,
-        pictures = symbol.PictureBuildCount, renders = symbol.RenderCount,
+        pictures = symbol.PictureBuildCount, retainedPictures = symbol.RetainedPictureCount,
+        alternateFill = symbol.LastAlternateFill, renders = symbol.RenderCount,
         animationFrames = symbol.AnimationInvalidations, animating = symbol.Animating, animationVisible = symbol.IsInAnimationViewport
     };
 }

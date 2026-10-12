@@ -9,10 +9,8 @@ public static partial class IndustrialSymbolRenderer
     {
         var path = new SKPath();
         if (appearance != "mimic") { path.AddRoundRect(SKRect.Create(10, 9, 80, 77), appearance == "p&id" ? 0 : 3, appearance == "p&id" ? 0 : 3); return path; }
-        if (horizontal)
-        { path.MoveTo(17, 12); path.LineTo(83, 12); path.CubicTo(98, 12, 98, 85, 83, 85); path.LineTo(17, 85); path.CubicTo(2, 85, 2, 12, 17, 12); }
-        else
-        { path.MoveTo(10, 15); path.CubicTo(10, 5, 90, 5, 90, 15); path.LineTo(90, 79); path.CubicTo(90, 90, 10, 90, 10, 79); }
+        if (horizontal) { path.MoveTo(17, 12); path.LineTo(83, 12); path.CubicTo(98, 12, 98, 85, 83, 85); path.LineTo(17, 85); path.CubicTo(2, 85, 2, 12, 17, 12); }
+        else { path.MoveTo(10, 15); path.CubicTo(10, 5, 90, 5, 90, 15); path.LineTo(90, 79); path.CubicTo(90, 90, 10, 90, 10, 79); }
         path.Close(); return path;
     }
     private static void Vessel(CanvasPainter p, SymbolOptions o, SymbolData data)
@@ -20,17 +18,17 @@ public static partial class IndustrialSymbolRenderer
         var c = StateColor(o); var horizontal = o.Orientation == "horizontal";
         using var body = VesselPath(horizontal, o.Appearance); Shape(p, body, c, o.Appearance == "mimic");
         var fraction = (float)SymbolPresentation.Fraction(data.Value, data.Minimum, data.Maximum);
-        var fluid = Color(data.Value >= data.Warning ? o.LiquidWarningColor : o.LiquidColor);
+        var fluid = Color(data.Value >= data.Warning ? o.LiquidWarningColor
+            : o.UseStateLiquidColor && o.StateStyle is { } style ? style.TertiaryColor : o.LiquidColor);
         if (o.DisplayFillLevel && o.LiquidOpacity > 0 && fraction > 0 && data.Quality == Quality.Good)
         {
             var save = p.Canvas.Save();
             try
             {
-                p.Canvas.ClipPath(body, antialias: true); var top = 85 - fraction * 76;
-                var alpha = (byte)Math.Round(fluid.Alpha * o.LiquidOpacity);
+                p.Canvas.ClipPath(body, antialias: true); var top = 85 - fraction * 76; var alpha = (byte)Math.Round(fluid.Alpha * o.LiquidOpacity);
                 p.Rect(SKRect.Create(5, top, 90, 88 - top), fluid.WithAlpha(alpha));
                 if (!horizontal && o.Appearance == "mimic") p.Ellipse(SKRect.Create(10, top - 4, 80, 8), fluid.WithAlpha(alpha));
-                else p.Line(7, top, 93, top, fluid, 1);
+                else p.Line(7, top, 93, top, fluid.WithAlpha(alpha), 1);
             }
             finally { p.Canvas.RestoreToCount(save); }
         }

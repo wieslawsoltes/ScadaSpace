@@ -22,5 +22,6 @@
     <Project Path="tests/ScadaSpace.Parity.Tests/ScadaSpace.Parity.Tests.csproj" />
     <Project Path="tests/ScadaSpace.Performance/ScadaSpace.Performance.csproj" />
     <Project Path="tests/ScadaSpace.Graphics.Tests/ScadaSpace.Graphics.Tests.csproj" />
+    <Project Path="tests/ScadaSpace.SymbolThemes.Tests/ScadaSpace.SymbolThemes.Tests.csproj" />
   </Folder>
 </Solution>
