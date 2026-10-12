@@ -21,5 +21,6 @@
     <Project Path="tests/ScadaSpace.Hardening.Tests/ScadaSpace.Hardening.Tests.csproj" />
     <Project Path="tests/ScadaSpace.Parity.Tests/ScadaSpace.Parity.Tests.csproj" />
     <Project Path="tests/ScadaSpace.Performance/ScadaSpace.Performance.csproj" />
+    <Project Path="tests/ScadaSpace.Graphics.Tests/ScadaSpace.Graphics.Tests.csproj" />
   </Folder>
 </Solution>

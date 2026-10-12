@@ -48,7 +48,7 @@ public static partial class SymbolRenderer
                 "Currency" => NumberFormatting.Format(data.Value, "C2"),
                 _ => NumberFormatting.Format(data.Value, data.Format)
             };
-            var unit = o.DisplayUnit.Length > 0 ? o.DisplayUnit : data.Unit;
+            var unit = o.ResolveUnit(data.Unit);
             if (unit.Length > 0) text = o.UnitPrefix ? unit + " " + text : text + " " + unit;
             p.Text(text, (right + 22) / 2, 122, 20, Ink, SKTextAlign.Center);
         }
