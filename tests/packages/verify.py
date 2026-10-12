@@ -63,6 +63,18 @@ var configurations = new ConfigurationIndex(); configurations.Refresh(document);
 var actionRows = configurations.Query("onClick",ConfigurationKind.Action);
 Check(actionRows.Count == 1 && ReferenceEquals(actionRows,configurations.Query("onClick",ConfigurationKind.Action)), "packaged configuration index reuses owned query snapshots");
 
+var styleDraft = new StyleClassDraft(document);
+styleDraft.Create("PackageStyle", new Dictionary<string, Scalar> { ["foreground"] = Scalar.From("#224466") });
+styleDraft.Assign(component.Id, ["PackageStyle"]);
+styleDraft.Apply(document);
+Check(document.Find(component.Id)!.StyleClasses.Contains("PackageStyle"), "packaged style edits retain component assignments");
+var styleResolver = new StyleResolver(document.Project.Styles);
+var styledNode = document.Find(component.Id)!;
+var style = styleResolver.Resolve(styledNode);
+Check(style.Values["foreground"].Text == "#224466" && ReferenceEquals(style, styleResolver.Resolve(styledNode)), "packaged style resolver reuses immutable cascade results");
+Check(style.Origins["foreground"].ClassName == "PackageStyle" && !style.Origins["foreground"].IsInline, "packaged style resolver reports the winning declaration origin");
+Check(StyleColor.Parse("#80446688").Alpha == 128 && StyleColor.Parse("#80446688").Blue == 136, "packaged color helpers retain explicit ARGB channel order");
+
 '''
 logs = []
 try:
@@ -81,8 +93,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 12:
-            raise RuntimeError(f"Expected twelve executed package checks; got {count}")
+        if count != 16:
+            raise RuntimeError(f"Expected sixteen executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):

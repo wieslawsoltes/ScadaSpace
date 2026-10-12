@@ -1,5 +1,7 @@
 # ScadaSpace
 
+> **Local candidate, not published:** this checkout includes style-class work based on deployed commit `4144fbc`. Its GitHub source upload was blocked. The new C# and Uno changes have not been compiled or browser-tested. See [candidate status and validation](docs/style-classes-local-candidate.md).
+
 An independent industrial visualization workbench built with **C#, Uno Platform and Skia**, targeting desktop and WebAssembly. Its engines, graphics and controls are separated into **twelve reusable libraries**.
 
 > **Scope:** this is an implemented simulation workbench, not full Ignition Perspective parity, a drop-in replacement, or a production-qualified industrial-control system. The demonstration never connects to live equipment. See the [compatibility matrix](docs/parity.md) for explicit boundaries.
@@ -78,7 +80,7 @@ The **Pages** editor configures routes such as `/equipment/:equipment`, primary 
 
 ## Hierarchical Tree controls
 
-The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virtualized Uno control. They support hierarchical expansion, filtered ancestors, keyboard navigation, multi-selection, typed contextual data, bound selection, and stable optional item IDs. Local tag browsing groups the existing memory provider by provider and folder; it does not connect to a Gateway or discover devices. See [Tree APIs and configuration](docs/trees.md) for behavior and limits.
+The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virtualized Uno control. They support hierarchical expansion, filtered ancestors, keyboard/multi-selection, typed contextual data, bound selection, and stable optional item IDs. Local tag browsing groups the existing memory provider by provider and folder; it does not connect to a Gateway or discover devices. See [Tree APIs and configuration](docs/trees.md) for behavior and limits.
 
 ## Designer workspace
 
@@ -103,3 +105,7 @@ Ignition and Perspective are trademarks of Inductive Automation. This project is
 ## License
 
 MIT for ScadaSpace source. Referenced packages retain their respective licenses.
+
+## Unpublished style review
+
+The local style-class candidate and its continuation are not yet compiled or deployed. See [review fixes, native editing source and validation limits](docs/style-review-validation.md). A blocked GitHub upload is not recorded as a successful push or merge.

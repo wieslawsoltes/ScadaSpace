@@ -124,6 +124,25 @@ var cachedLayout = Measure("designer_layout_cached_2000", 1000, () => layoutCach
 reports.Add(cachedLayout);
 if (cachedLayout.BytesPerOperation != 0 || layoutCache.BuildCount != 1) throw new Exception("Idle designer layout was rebuilt or allocated.");
 
+var styleDocument = new DesignerDocument(DemoProject.Create());
+var styleNode = styleDocument.Project.Views[0].Root;
+styleNode.StyleClasses.Add("card");
+var styleResolver = new StyleResolver(styleDocument.Project.Styles);
+var resolvedStyle = styleResolver.Resolve(styleNode);
+var styleLookup = Measure("style_cascade_cached_snapshot", 1000, () => styleResolver.Resolve(styleNode).Values.Count);
+reports.Add(styleLookup);
+if (styleLookup.BytesPerOperation != 0 || styleResolver.ResolveCount != 1 || !ReferenceEquals(resolvedStyle, styleResolver.Resolve(styleNode)))
+    throw new Exception("Unchanged style resolution must retain its immutable result without allocation.");
+
+var usageDraft = new StyleClassDraft(configurationDocument);
+usageDraft.Create("UsageProbe");
+usageDraft.Assign(configurationDocument.Project.Views[0].Root.Id, ["UsageProbe"]);
+var indexedUsage = Measure("style_reference_count_indexed", 1000, () => usageDraft.ReferenceCount("UsageProbe"));
+var parsedColor = Measure("style_color_parse", 1000, () => StyleColor.TryParse("#80112233", out var c) ? c.Red : -1);
+reports.AddRange([indexedUsage, parsedColor]);
+if (indexedUsage.BytesPerOperation != 0 || parsedColor.BytesPerOperation != 0)
+    throw new Exception("Reference counts and ARGB parsing must not allocate per lookup.");
+
 Directory.CreateDirectory("TestResults");
 File.WriteAllText("TestResults/performance.json", JsonSerializer.Serialize(new {
     runtime = RuntimeInformation.FrameworkDescription, os = RuntimeInformation.OSDescription,
