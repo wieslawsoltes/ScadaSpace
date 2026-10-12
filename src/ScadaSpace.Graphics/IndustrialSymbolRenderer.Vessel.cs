@@ -25,10 +25,10 @@ public static partial class IndustrialSymbolRenderer
             var save = p.Canvas.Save();
             try
             {
-                p.Canvas.ClipPath(body, antialias: true); var top = 85 - fraction * 76; var alpha = (byte)Math.Round(fluid.Alpha * o.LiquidOpacity);
-                p.Rect(SKRect.Create(5, top, 90, 88 - top), fluid.WithAlpha(alpha));
-                if (!horizontal && o.Appearance == "mimic") p.Ellipse(SKRect.Create(10, top - 4, 80, 8), fluid.WithAlpha(alpha));
-                else p.Line(7, top, 93, top, fluid.WithAlpha(alpha), 1);
+                p.Canvas.ClipPath(body, antialias: true); var top = 85 - fraction * 76;
+                if (!horizontal && o.Appearance == "mimic")
+                    p.LiquidColumn(SKRect.Create(10, top, 80, 88 - top), 4, fluid, o.LiquidOpacity);
+                else p.LiquidColumn(SKRect.Create(5, top, 90, 88 - top), 0, fluid, o.LiquidOpacity);
             }
             finally { p.Canvas.RestoreToCount(save); }
         }

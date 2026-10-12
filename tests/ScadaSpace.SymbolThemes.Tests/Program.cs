@@ -106,6 +106,7 @@ Check("render primary and alternate theme contact sheet", () =>
     { using var cache = new SymbolRenderCache(); cache.Draw(surface.Canvas, SKRect.Create(col * 240 + 12, row * 260 + 12, 216, 236), kinds[col], Data(kinds[col]), row * .75); }
     using var image = surface.Snapshot(); using var png = image.Encode(SKEncodedImageFormat.Png, 100); File.WriteAllBytes("TestResults/symbol-themes/state-themes.png", png.ToArray()); CanvasPainter.DrawingTypeface = null;
 });
+MaterialReview.Run(Check);
 var summary = JsonSerializer.Serialize(new { tests = results.Count, failures, results }, new JsonSerializerOptions { WriteIndented = true });
 File.WriteAllText("TestResults/symbol-themes/results.json", summary);
 Console.WriteLine($"RESULT {results.Count - failures}/{results.Count} symbol theme checks passed");
