@@ -5,7 +5,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 | Area | Implemented | Remaining boundary |
 |---|---|---|
 | Designer shell | Compact vector commands, persistent project/tag/property panes, auto-hidden/pinned searchable list/tile palette, non-destructive bottom resource tabs and resizable panels | Not pixel-identical; no licensed icon pack, arbitrary dock layout or complete designer window parity; dedicated nested-property tree editor not published |
-| Canvas editing | Pointer selection, additive selection, marquee, snapped move/resize, alignment, z-order, clipboard, undo/redo, rulers and zoom | No full nested transformed-coordinate editing, constraint solver or complete Perspective designer shortcut/menu parity |
+| Canvas editing | Pointer selection, additive selection, marquee, snapped move/resize, alignment, z-order, clipboard, undo/redo, reference-preserving coordinate wrapping, source-view navigation, rulers and zoom | No full nested transformed-coordinate editing, constraint solver or complete Perspective designer shortcut/menu parity |
 | Project model | Validated JSON, views, pages, style classes, parameters, custom props and actions | Own schema; does not import/export Ignition project archives |
 | Values and tags | Qualified scalar/object/array values, immutable nested writes, memory provider, revisions, write checks, subscriptions, local audit | No real OPC-UA/device transport, UDT inheritance, complete Ignition dataset/document semantics, remote providers or Gateway tag manager |
 | Bindings | Direct/indirect tag, nested property and expression bindings, synchronous expression structures, local read-only Tag History queries, ordered expression/scale/format/map transforms, isolated property-change observers | No SQL/named-query or HTTP binding, asynchronous expression-structure coordination, full Perspective expression-function parity or Jython transform |
@@ -27,7 +27,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 ## Verification scope
 
-Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Seven browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace and event configuration. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
+Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Eight browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration and hierarchy editing. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
 
 Counts and pass/fail claims apply only to the exact revision in the corresponding Actions artifacts. Build success alone is not runtime evidence. See [validation](validation.md), [configuration workflows](configuration-workflows.md), and the retained source, reports and screenshots for executed scope.
 
@@ -45,3 +45,5 @@ See [page navigation and docked sessions](page-sessions.md) and [hierarchical tr
 See [local history bindings and review](history-bindings.md) for the added query APIs, streaming aggregation, table error recovery and the excluded chart-renderer work.
 
 See [designer workspace and UI review](designer-workspace.md) for the independently implemented layout, tab/pane behavior, control reuse, keyboard fixes and remaining visual boundaries.
+
+See [designer hierarchy editing and performance review](hierarchy-editing.md) for wrapping, evaluated source navigation, rollback recovery and indexed layout/lookup APIs.

@@ -75,7 +75,8 @@ public sealed partial class DesignerDocument
         {
             if (!path.StartsWith("parent.", StringComparison.Ordinal)) return path;
             if (!isRoot && owner is ("this" or "parent" or "root" or "page" or "view") || owner.Contains('{') || owner.Contains('}') || owner.Any(char.IsControl)
-                || new[] { ".props.", ".custom.", ".style." }.Any(marker => owner.Contains(marker, StringComparison.Ordinal)))
+                || owner.StartsWith('[') || (owner + ".").StartsWith("view.params.", StringComparison.Ordinal)
+                || new[] { ".props.", ".custom.", ".style." }.Any(marker => (owner + ".").Contains(marker, StringComparison.Ordinal)))
                 throw new InvalidOperationException("This parent ID cannot be used in a stable binding reference.");
             return owner + path[6..];
         }
