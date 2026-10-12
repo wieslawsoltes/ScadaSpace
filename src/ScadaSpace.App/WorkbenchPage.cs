@@ -63,6 +63,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         _explorer.ItemInvoked += (_, args) =>
         {
             var item = args.InvokedItem is TreeViewNode treeNode ? treeNode.Content as ExplorerItem : args.InvokedItem as ExplorerItem;
+            if (item?.IsStyles == true) { RunDialog(() => EditStyleClassesAsync(item.StyleName)); return; }
             if (item?.IsPageConfiguration == true) { RunDialog(EditPagesAsync); return; }
             if (item?.View is not { } view) return;
             if (_view != view) OpenView(view);
@@ -85,7 +86,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         };
         Unloaded += (_, _) => { _timer.Stop(); FlushPanelPreferences(); };
     }
-    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); InitializeHierarchyCommands(); }
+    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); InitializeStyleTools(); InitializeHierarchyCommands(); }
     private void AddMenu(MenuBar menu, string title, params (string Text, Action Action)[] items)
     {
         var group = new MenuBarItem { Title = title, FontSize = 12, MinHeight = 0, Padding = new Thickness(6, 0, 6, 0) };
@@ -190,5 +191,5 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     private void SetStatus(string text) => _status.Text = text;
     public void ReportUnhandled(string message) { _errors.Add(message); while (_errors.Count > 20) _errors.RemoveAt(0); SetStatus(message); PublishTelemetry(); }
     public new void Dispose() { _timer.Stop(); FlushPanelPreferences(); if (_session is not null) { _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated; } _pageHost.Dispose(); _surface.Dispose(); _runtime?.Dispose(); }
-    private sealed record ExplorerItem(string Name, string? View = null, string? ComponentId = null, bool IsPageConfiguration = false) { public override string ToString() => Name; }
+    private sealed record ExplorerItem(string Name, string? View = null, string? ComponentId = null, bool IsPageConfiguration = false, bool IsStyles = false, string? StyleName = null) { public override string ToString() => Name; }
 }

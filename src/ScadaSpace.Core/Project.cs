@@ -175,6 +175,8 @@ public static partial class ProjectCodec
                 foreach (var t in binding.Transforms)
                     if (t is null || !Enum.IsDefined(t.Kind) || t.Map is null || t.Expression is null || t.Format is null || !Finite(t.InputMin) || !Finite(t.InputMax) || !Finite(t.OutputMin) || !Finite(t.OutputMax)) Error("Invalid transform.", path);
             }
+            try { StyleRules.ValidateValues(node.Style); StyleRules.ValidateAssignments(node.StyleClasses); }
+            catch (ArgumentException ex) { Error(ex.Message, path + "/style"); }
             try { EventConfigurations.Validate(node.Events); }
             catch (ArgumentException ex) { Error(ex.Message, path + "/events"); }
             foreach (var child in node.Children) Node(child, path + "/" + child?.Name, depth + 1);
@@ -201,6 +203,8 @@ public static partial class ProjectCodec
         var alarmIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var alarm in project.Alarms)
             if (alarm is null || !alarmIds.Add(alarm.Id) || !paths.Contains(alarm.TagPath) || !double.IsFinite(alarm.Setpoint) || !double.IsFinite(alarm.Deadband) || alarm.Deadband < 0 || !double.IsFinite(alarm.ActiveDelaySeconds) || alarm.ActiveDelaySeconds < 0 || !double.IsFinite(alarm.ClearDelaySeconds) || alarm.ClearDelaySeconds < 0 || !Enum.IsDefined(alarm.Mode) || !Enum.IsDefined(alarm.Priority)) Error("Invalid alarm definition or unknown tag.", "alarms");
+        try { StyleRules.ValidateClasses(project.Styles); }
+        catch (ArgumentException ex) { Error(ex.Message, "styles"); }
         errors.AddRange(ValidatePages(project));
         return errors;
     }

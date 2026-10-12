@@ -24,7 +24,7 @@ public sealed partial class WorkbenchPage
         {
             used.Add(key);
             if(!_explorerNodes.TryGetValue(key,out var node)) {node=new(){IsExpanded=expanded};_explorerNodes.Add(key,node);_explorerNodesCreated++;}
-            var content=new ExplorerItem(title,view,id,key=="pages");if(!Equals(node.Content,content))node.Content=content;
+            var content=new ExplorerItem(title,view,id,key=="pages",key=="styles"||key.StartsWith("style:",StringComparison.Ordinal),key.StartsWith("style:",StringComparison.Ordinal)?key[6..]:null);if(!Equals(node.Content,content))node.Content=content;
             return node;
         }
         static void Sync(IList<TreeViewNode> target,IReadOnlyList<TreeViewNode> source)
