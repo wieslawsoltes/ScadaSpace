@@ -71,7 +71,7 @@ internal static partial class BrowserServices
 #if __WASM__
         PublishViewObservations();
         // Read-only observations for browser automation. No JS-to-managed command/evaluation backdoor is exposed.
-        Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.scadaApp=" + JsonSerializer.Serialize(value, ProjectCodec.Options) + "; document.documentElement.dataset.scadaspaceReady='true'; '';");
+        Uno.Foundation.WebAssemblyRuntime.InvokeJS("window.scadaApp=" + JsonSerializer.Serialize(value, ProjectCodec.Options) + "; document.documentElement.dataset.scadaspaceReady=window.scadaApp.ready?'true':'false'; '';");
 #endif
     }
     public static void OpenSession()

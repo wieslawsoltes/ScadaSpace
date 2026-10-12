@@ -1,6 +1,6 @@
 # Bounded browser validation
 
-`python tests/browser/run_all.py --workers 2` runs the eleven native Uno suites with at most two independent browser-suite processes at once. `--workers 1` retains a serial mode. Every suite continues to launch its own browser/context, import or load its own project, and write its existing distinct evidence directory. The only shared service is the read-only local static application server.
+The release gate uses `python tests/browser/run_all.py --workers 1` to run all eleven native Uno suites serially. The optional `--workers 2` mode remains available for local concurrency diagnostics, but is not used as deployment evidence after parallel-run input races. Every suite continues to launch its own browser/context, import or load its own project, and write its existing distinct evidence directory. The only shared service is the read-only local static application server.
 
 The explicit suite registry includes smoke, structured runtime, pages, trees, history, workspace, events, hierarchy, styles, symbols and symbol states. No individual assertions were removed or replaced by orchestration success. All suites are collected even if an earlier suite fails. A nonzero exit, exception, malformed result or 900-second suite timeout makes the overall invocation fail. A timeout terminates only that newly created suite process group, including its browser children, and does not retry it.
 

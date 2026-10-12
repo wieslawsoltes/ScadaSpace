@@ -57,7 +57,7 @@ internal static partial class BrowserServices
                     tree = element is HmiTree tree ? ObserveTree(tree) : null
                 };
             }
-            views.Add(new { id = Identities.GetValue(instance, _ => new()).Id, view = instance.View.Path, evaluations = instance.EvaluationCount, bindingIndexBuilds = instance.BindingIndexBuildCount, historyReads = instance.HistoryQueryReads, historyHits = instance.HistoryQueryHits, parameters = instance.Parameters, components, diagnostics = instance.Diagnostics.ToArray() });
+            views.Add(new { id = Identities.GetValue(instance, _ => new()).Id, view = instance.View.Path, editing = current.IsEditing, evaluations = instance.EvaluationCount, bindingIndexBuilds = instance.BindingIndexBuildCount, historyReads = instance.HistoryQueryReads, historyHits = instance.HistoryQueryHits, parameters = instance.Parameters, components, diagnostics = instance.Diagnostics.ToArray() });
             foreach (var embedded in current.EmbeddedHosts) Observe(embedded);
         }
         Observe(host);

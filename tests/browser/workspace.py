@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from native_readiness import wait_command_bounds
 
 OUT = Path('TestResults/browser-workspace'); OUT.mkdir(parents=True, exist_ok=True)
 BASE = os.environ.get('SCADASPACE_URL', 'http://127.0.0.1:8765/ScadaSpace/')
@@ -22,8 +23,7 @@ with sync_playwright() as p:
         assert box and box['width']>0 and box['height']>0, 'Missing native geometry'
         page.mouse.click(box['x']+box['width']/2, box['y']+box['height']/2, button=button)
     def command(name):
-        page.wait_for_function('key=>window.scadaApp.controls[key]?.width>0', arg=name, timeout=30000)
-        click(bounds(name)); page.wait_for_timeout(350)
+        click(wait_command_bounds(page, name)); page.wait_for_timeout(350)
     def fill(name, text):
         command(name); page.keyboard.press('Control+a'); page.keyboard.press('Backspace')
         if text: page.keyboard.insert_text(text)
@@ -103,8 +103,14 @@ with sync_playwright() as p:
         command('reopen-view'); wait("window.scadaApp.workspace.active==='Overview'")
         check('reopening a resource restores its modified design', app()['componentCount']==components+1 and app()['dirty'] and app()['components'])
         command('undo'); wait('window.scadaApp.componentCount=='+str(components))
-        command('fit'); page.set_viewport_size({'width':1024,'height':768}); page.wait_for_timeout(500); command('fit')
+        previous_tick = app()['tick']
+        page.set_viewport_size({'width':1024,'height':768})
+        wait("window.scadaApp.viewport.width===1024 && window.scadaApp.viewport.height===768 && window.scadaApp.tick>"+str(previous_tick+1))
+        wait("window.scadaApp.controls['project-filter']===null && window.scadaApp.controls['view-Overview']?.y>650 && window.scadaApp.controls['property-pane-close']?.width>0")
+        command('fit')
+        wait("window.scadaApp.zoom<.75 && Math.abs(window.scadaApp.components.Tank01.bounds.width - window.scadaApp.components.Tank01.width * window.scadaApp.zoom)<1")
         check('tablet layout keeps commands resources and property editor usable', app()['viewport']['width']==1024 and bounds('view-Overview')['y']>650 and bounds('project-filter') is None and bounds('property-pane-close') is not None)
+        check('tablet Fit completes native scaled layout before further input', app()['zoom']<.75 and abs(app()['components']['Tank01']['bounds']['width']-app()['components']['Tank01']['width']*app()['zoom'])<1)
         page.screenshot(path=str(OUT/'workspace-tablet.png'),full_page=True)
         check('workspace interactions finish without managed or browser exceptions', not app()['errors'] and not app()['diagnostics'] and not any(e['kind']=='pageerror' for e in logs))
     except Exception as error:

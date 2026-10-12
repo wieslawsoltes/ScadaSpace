@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from native_readiness import wait_command_bounds
 
 OUT = Path('TestResults/browser-symbols'); OUT.mkdir(parents=True, exist_ok=True)
 BASE = os.environ.get('SCADASPACE_URL', 'http://127.0.0.1:8765/ScadaSpace/')
@@ -63,8 +64,7 @@ with sync_playwright() as p:
         assert box and box['width']>0 and box['height']>0,'Missing rendered native bounds'
         page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
     def command(key):
-        page.wait_for_function('k=>window.scadaApp.controls[k]?.width>0',arg=key,timeout=30000)
-        click(app()['controls'][key]);page.wait_for_timeout(300)
+        click(wait_command_bounds(page, key));page.wait_for_timeout(300)
     def fill(name,text):
         click(component(name)['bounds']);page.keyboard.press('Control+a');page.keyboard.press('Backspace');page.keyboard.insert_text(str(text));page.keyboard.press('Enter');page.wait_for_timeout(350)
     def ticks(count=3):
@@ -89,10 +89,19 @@ with sync_playwright() as p:
         with page.expect_download() as event:command('export')
         event.value.save_as(OUT/'baseline-export.json')
         baseline=json.loads((OUT/'baseline-export.json').read_text())
-        command('preview');wait('window.scadaApp.preview');ticks()
-        before={n:symbol(n)['pictures'] for n in names};ticks(5)
+        design_view_id=views()[0]['id']
+        command('preview');wait('window.scadaApp.preview')
+        page.wait_for_function('''args => {
+            const view=window.scadaViews?.[0];
+            return view && view.id!==args.previous && view.editing===false
+                && args.names.every(name=>{const s=view.components[name]?.symbol; return s?.pictures>0 && s.renders>0 && s.dataError===null && s.renderError===null;});
+        }''',arg={'previous':design_view_id,'names':names},timeout=30000)
+        before={n:{key:symbol(n)[key] for key in ('id','pictures','renders')} for n in names}
+        logs.append({'kind':'runtime-cache-baseline','view':views()[0]['id'],'symbols':before})
+        check('cache baseline belongs to fully drawn runtime controls rather than detached designer controls',views()[0]['id']!=design_view_id and not views()[0]['editing'] and all(row['pictures']>0 and row['renders']>0 for row in before.values()))
+        ticks(5)
         check('offscreen running symbols do not schedule paint invalidations',not symbol('OffscreenPump')['animationVisible'] and symbol('OffscreenPump')['animationFrames']==0)
-        check('idle runtime refreshes reuse every unchanged vector picture',all(symbol(n)['pictures']==before[n] for n in names))
+        check('idle runtime refreshes reuse every unchanged vector picture',all(symbol(n)['pictures']==before[n]['pictures'] and symbol(n)['id']==before[n]['id'] for n in names))
         check('vessel readout uses its independent capacity',symbol('Vessel')['maximum']==200 and symbol('Vessel')['options']['readout']['text']=='22.5%')
         page.screenshot(path=str(OUT/'symbols-mimic.png'),full_page=True)
         for appearance in ['simple','p&id','mimic']:
