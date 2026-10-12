@@ -18,8 +18,12 @@ public static partial class IndustrialSymbolRenderer
             if (kind == SymbolKind.Pump && o.Variant == "centrifugal" && o.Appearance != "p&id")
             {
                 p.Canvas.RotateDegrees((float)(phase * 360), 45, 47);
-                for (var i = 0; i < 6; i++)
-                { var a = i * Math.PI / 3; p.Line(45 + (float)Math.Cos(a) * 5, 47 + (float)Math.Sin(a) * 5, 45 + (float)Math.Cos(a + .6) * 17, 47 + (float)Math.Sin(a + .6) * 17, c, 2); }
+                var blades = o.Appearance == "mimic" ? 8 : 6;
+                for (var i = 0; i < blades; i++)
+                {
+                    p.Curve(50, 46, 57, 37, 53, 28, 44, 26, c, o.Appearance == "mimic" ? 1 : 1.8f);
+                    p.Canvas.RotateDegrees(360f / blades, 45, 47);
+                }
                 p.Circle(45, 47, 5, Shell); p.Circle(45, 47, 5, c, true, 1.5f);
             }
             else if (kind == SymbolKind.Vessel && o.DisplayAgitator)

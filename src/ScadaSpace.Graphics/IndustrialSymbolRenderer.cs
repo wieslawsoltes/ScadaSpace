@@ -28,7 +28,12 @@ public static partial class IndustrialSymbolRenderer
             }
             return slot;
         }
-        var label = Reserve(options.Label); var readout = Reserve(options.Readout); return new(body, label, readout);
+        // Captions precede readouts in reading order even when both reserve bottom space.
+        SKRect label, readout;
+        if (options.Label.Location == "bottom" && options.Readout.Location == "bottom")
+        { readout = Reserve(options.Readout); label = Reserve(options.Label); }
+        else { label = Reserve(options.Label); readout = Reserve(options.Readout); }
+        return new(body, label, readout);
     }
     public static SKRect BodyBounds(SKRect bounds, SymbolKind kind, SymbolOptions options)
     {
@@ -83,7 +88,8 @@ public static partial class IndustrialSymbolRenderer
         try
         {
             p.Canvas.ClipRect(r);
-            var align = text.Justify == "left" ? SKTextAlign.Left : text.Justify == "right" ? SKTextAlign.Right : SKTextAlign.Center;
+            var justify = text.Justify == "auto" ? text.Location == "left" ? "right" : text.Location == "right" ? "left" : "center" : text.Justify;
+            var align = justify == "left" ? SKTextAlign.Left : justify == "right" ? SKTextAlign.Right : SKTextAlign.Center;
             p.Text(quality == Quality.Good ? text.Text : "—", align == SKTextAlign.Left ? r.Left : align == SKTextAlign.Right ? r.Right : r.MidX,
                 r.MidY + (float)text.FontSize * .34f, (float)text.FontSize, Color(text.Color), align);
         }

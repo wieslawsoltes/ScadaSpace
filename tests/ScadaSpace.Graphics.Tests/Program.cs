@@ -5,6 +5,9 @@ using ScadaSpace.Core;
 using ScadaSpace.Graphics;
 using SkiaSharp;
 
+// Use a system-resolved drawing font; no font files are copied into evidence.
+using var typeface = SKTypeface.FromFamilyName("DejaVu Sans");
+CanvasPainter.DrawingTypeface = typeface;
 var results = new List<object>(); var failures = 0;
 Directory.CreateDirectory("TestResults/symbols");
 void Check(string name, Action test)
@@ -32,6 +35,7 @@ foreach (var kind in Enum.GetValues<SymbolKind>())
         SymbolRenderer.Draw(canvas, SKRect.Create(10, 10, 180, 180), kind, Data(kind));
         Assert(canvas.TotalMatrix == matrix && canvas.SaveCount == saved);
         using var image = surface.Snapshot(); using var bitmap = SKBitmap.FromImage(image); Assert(bitmap.GetPixel(0, 0) == SKColors.White && bitmap.GetPixel(255, 255) == SKColors.White);
+        Assert(bitmap.Pixels.Count(pixel => pixel != SKColors.White) > 30, "A blank drawing is not a valid symbol.");
     });
 foreach (var kind in new[] { SymbolKind.Pump, SymbolKind.Motor, SymbolKind.Valve, SymbolKind.Sensor, SymbolKind.Vessel })
     Check(kind + " has distinct Mimic Simple and P&ID geometry", () => Assert(new[] { "mimic", "simple", "p&id" }.Select(mode => Image(kind, Data(kind, mode))).Distinct().Count() == 3));
@@ -109,6 +113,18 @@ Check("quality overlays handle tiny and distant finite bounds without leaking ca
     Throws(()=>SymbolRenderer.DrawQuality(c,new SKRect(float.NaN,0,10,10),Quality.Stale));
     Throws(()=>SymbolRenderer.Draw(c,SKRect.Create(100,100),SymbolKind.Tank,new(Minimum:-10,Maximum:0)));
 });
+Check("bottom captions precede readouts while both remain below the symbol body", () => {
+    var options = new SymbolOptions { Label = new("P-101"), Readout = new("42 m3/h") };
+    var layout = IndustrialSymbolRenderer.Arrange(SKRect.Create(200, 240), options);
+    Assert(layout.Body.Bottom <= layout.Label.Top && layout.Label.Bottom <= layout.Readout.Top);
+});
+Check("zero liquid opacity removes fill edges as well as fill surfaces", () => {
+    var vessel = Data(SymbolKind.Vessel);
+    Assert(Image(SymbolKind.Vessel, vessel with {Options = vessel.Options! with {LiquidOpacity = 0}})
+        == Image(SymbolKind.Vessel, vessel with {Options = vessel.Options! with {DisplayFillLevel = false}}));
+    var tank = new SymbolData(Value: 40, Tank: new(ShowValue: false, LiquidOpacity: 0));
+    Assert(Image(SymbolKind.Tank, tank) == Image(SymbolKind.Tank, tank with {Value = 0, Tank = tank.Tank! with {LiquidOpacity = 1}}));
+});
 Check("render all industrial appearance and state contact sheets", () => {
     var kinds=new[]{SymbolKind.Pump,SymbolKind.Pump,SymbolKind.Motor,SymbolKind.Valve,SymbolKind.Sensor,SymbolKind.Vessel};
     using var surface=SKSurface.Create(new SKImageInfo(1200,840));surface.Canvas.Clear(SKColors.White);
@@ -119,6 +135,20 @@ Check("render all industrial appearance and state contact sheets", () => {
         SymbolRenderer.Draw(surface.Canvas,SKRect.Create(col*200+8,row*280+8,184,260),kind,d);
     }
     using var image=surface.Snapshot();using var bytes=image.Encode(SKEncodedImageFormat.Png,100);File.WriteAllBytes("TestResults/symbols/industrial-gallery.png",bytes.ToArray());
+});
+Check("render display and drawing primitive contact sheet", () => {
+    var kinds = new[] {SymbolKind.Tank, SymbolKind.Gauge, SymbolKind.Thermometer, SymbolKind.LEDDisplay, SymbolKind.Pipe, SymbolKind.Rectangle, SymbolKind.Ellipse, SymbolKind.Line};
+    using var surface = SKSurface.Create(new SKImageInfo(1200, 660)); surface.Canvas.Clear(SKColors.White);
+    using var painter = new CanvasPainter(surface.Canvas);
+    for (var i = 0; i < kinds.Length; i++)
+    {
+        var x = i % 4 * 300f; var y = i / 4 * 330f;
+        painter.Text(kinds[i].ToString(), x + 150, y + 28, 16, SKColors.DimGray, SKTextAlign.Center);
+        var data = new SymbolData(Value: 45, Unit: "%", StrokeWidth: kinds[i] == SymbolKind.Pipe ? 14 : 2);
+        SymbolRenderer.Draw(surface.Canvas, SKRect.Create(x + 25, y + 45, 250, 260), kinds[i], data);
+    }
+    using var image = surface.Snapshot(); using var bytes = image.Encode(SKEncodedImageFormat.Png, 100);
+    File.WriteAllBytes("TestResults/symbols/display-gallery.png", bytes.ToArray());
 });
 File.WriteAllText("TestResults/symbols/results.json",JsonSerializer.Serialize(new {tests=results.Count,failures,results},new JsonSerializerOptions{WriteIndented=true}));
 Console.WriteLine($"{results.Count-failures}/{results.Count} graphics checks passed");

@@ -21,7 +21,7 @@ public static partial class IndustrialSymbolRenderer
         using var body = VesselPath(horizontal, o.Appearance); Shape(p, body, c, o.Appearance == "mimic");
         var fraction = (float)SymbolPresentation.Fraction(data.Value, data.Minimum, data.Maximum);
         var fluid = Color(data.Value >= data.Warning ? o.LiquidWarningColor : o.LiquidColor);
-        if (o.DisplayFillLevel && fraction > 0 && data.Quality == Quality.Good)
+        if (o.DisplayFillLevel && o.LiquidOpacity > 0 && fraction > 0 && data.Quality == Quality.Good)
         {
             var save = p.Canvas.Save();
             try
@@ -40,7 +40,12 @@ public static partial class IndustrialSymbolRenderer
             if (horizontal) { p.Ellipse(SKRect.Create(9, 12, 16, 73), c, true, .8f); p.Arc(SKRect.Create(75, 12, 16, 73), -90, 180, c, .7f); }
             else { p.Ellipse(SKRect.Create(10, 9, 80, 11), c, true, .8f); for (var i = 0; i < 8; i++) p.Line(78, 26 + i * 7, 89, 24 + i * 7, c, .7f); }
         }
+        if (o.Appearance == "simple")
+        {
+            p.Rect(SKRect.Create(12, 11, 76, 73), c, 2, true, .65f);
+            for (var i = 0; i < 4; i++) { p.Line(9, 20 + i * 17, 11, 20 + i * 17, c, 1.5f); p.Line(89, 20 + i * 17, 91, 20 + i * 17, c, 1.5f); }
+        }
         if (o.DisplayStand) { p.Line(18, 84, 18, 96, c, 2); p.Line(82, 84, 82, 96, c, 2); if (horizontal) { p.Line(24, 85, 24, 95, c); p.Line(76, 85, 76, 95, c); } }
-        if (o.DisplayAgitator) { Box(p, SKRect.Create(47, 9, 6, 57), c); p.Line(50, 66, 50, 76, c, 1.5f); }
+        if (o.DisplayAgitator) { p.Line(49, 9, 49, 76, c, .8f); p.Line(51, 9, 51, 76, c, .8f); }
     }
 }

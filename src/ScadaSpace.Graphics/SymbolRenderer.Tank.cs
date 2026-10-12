@@ -22,7 +22,7 @@ public static partial class SymbolRenderer
         {
             p.Canvas.ClipPath(silhouette, antialias: true);
             p.Gradient(SKRect.Create(22, 10, right - 22, 205), shell, Blend(shell, SKColors.White, .8f), shell);
-            if (fraction > 0 && data.Quality == Quality.Good)
+            if (fraction > 0 && o.LiquidOpacity > 0 && data.Quality == Quality.Good)
             {
                 var y = 205 - fraction * 181;
                 var fill = liquid.WithAlpha((byte)Math.Round(liquid.Alpha * o.LiquidOpacity));

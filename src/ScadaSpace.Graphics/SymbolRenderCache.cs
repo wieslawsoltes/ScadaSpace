@@ -28,9 +28,19 @@ public static partial class SymbolRenderer
     internal static void DrawBase(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolData data)
     {
         if (IndustrialSymbolRenderer.Supports(kind)) IndustrialSymbolRenderer.DrawStatic(canvas, bounds, kind, data);
-        else DrawLegacy(canvas, bounds, kind, data);
+        else DrawLegacy(canvas, DisplayBounds(bounds, kind), kind, data);
         if (data.Quality != Quality.Good) DrawQuality(canvas, bounds, data.Quality);
     }
+    private static SKRect DisplayBounds(SKRect bounds, SymbolKind kind)
+    {
+        if (kind is not (SymbolKind.Gauge or SymbolKind.Thermometer)) return bounds;
+        var designWidth = kind == SymbolKind.Gauge ? 220f : 100f;
+        var designHeight = kind == SymbolKind.Gauge ? 150f : 220f;
+        var scale = Math.Min(bounds.Width / designWidth, bounds.Height / designHeight);
+        var width = designWidth * scale; var height = designHeight * scale;
+        return SKRect.Create(bounds.MidX - width / 2, bounds.MidY - height / 2, width, height);
+    }
+
 }
 
 /// <summary>One UI-thread-owned vector picture per symbol. No raster image copies or retained global symbol cache.</summary>
