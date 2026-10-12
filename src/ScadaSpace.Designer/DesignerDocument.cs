@@ -6,7 +6,7 @@ public enum Alignment { Left, Right, Top, Bottom, HorizontalCenter, VerticalCent
 public sealed record EditRecord(string Label, string Before, string After);
 
 /// <summary>Validated, atomic model edits with bounded undo/redo. Mutations must use Execute to participate in change tracking.</summary>
-public sealed class DesignerDocument
+public sealed partial class DesignerDocument
 {
     private sealed record HistoryEntry(EditRecord Edit, long BeforeState, long AfterState)
     {
@@ -29,9 +29,11 @@ public sealed class DesignerDocument
     public DesignerDocument(ProjectDefinition project) => Project = ProjectCodec.Clone(project);
     public void Execute(string label, Action<ProjectDefinition> edit)
     {
+        if (_editing) throw new InvalidOperationException("Document transactions cannot be nested.");
         var before = ProjectCodec.Serialize(Project);
         var selection = Selection.ToArray();
         string after;
+        _editing = true; _nodeIndex = null;
         try
         {
             edit(Project);
@@ -45,8 +47,10 @@ public sealed class DesignerDocument
         {
             Project = ProjectCodec.Deserialize(before);
             Selection.Clear(); Selection.UnionWith(selection);
+            _editing = false; _nodeIndex = null; NotifyRestored();
             throw;
         }
+        finally { _editing = false; _nodeIndex = null; }
         var previousState = _state;
         _state = ++_sequence;
         _undo.Add(new(new(label, before, after), previousState, _state));
@@ -58,21 +62,22 @@ public sealed class DesignerDocument
     }
     public bool Undo()
     {
+        if (_editing) throw new InvalidOperationException("Cannot undo an in-progress transaction.");
         if (_undo.Count == 0) return false;
         var entry = _undo[^1]; var restored = ProjectCodec.Deserialize(entry.Edit.Before);
-        _undo.RemoveAt(_undo.Count - 1); _redo.Push(entry); Project = restored; _state = entry.BeforeState;
+        _undo.RemoveAt(_undo.Count - 1); _redo.Push(entry); Project = restored; _nodeIndex = null; _state = entry.BeforeState;
         Generation++; PruneSelection(); Changed?.Invoke(); return true;
     }
     public bool Redo()
     {
+        if (_editing) throw new InvalidOperationException("Cannot redo an in-progress transaction.");
         if (!_redo.TryPeek(out var entry)) return false;
         var restored = ProjectCodec.Deserialize(entry.Edit.After);
-        _redo.Pop(); _undo.Add(entry); Project = restored; _state = entry.AfterState;
+        _redo.Pop(); _undo.Add(entry); Project = restored; _nodeIndex = null; _state = entry.AfterState;
         Generation++; PruneSelection(); Changed?.Invoke(); return true;
     }
     public void MarkSaved() => _savedState = _state;
     public void MarkUnsaved() => _savedState = -1;
-    public ComponentNode? Find(string id) => Project.Views.SelectMany(v => v.Root.DescendantsAndSelf()).FirstOrDefault(n => n.Id == id);
     public void Select(string? id, bool additive = false)
     {
         if (!additive) Selection.Clear();
@@ -159,11 +164,6 @@ public sealed class DesignerDocument
             Selection.Clear();
             foreach (var node in nodes) { node.Name += "Copy"; node.X += 16; node.Y += 16; parent.Children.Add(node); Selection.Add(node.Id); }
         });
-    }
-    private IEnumerable<ComponentNode> SelectedRoots()
-    {
-        var selected = Project.Views.SelectMany(v => v.Root.DescendantsAndSelf()).Where(n => Selection.Contains(n.Id)).ToArray();
-        return selected.Where(n => !selected.Any(other => other != n && other.DescendantsAndSelf().Skip(1).Any(child => child.Id == n.Id)));
     }
     public static double Snap(double value, double grid)
     {

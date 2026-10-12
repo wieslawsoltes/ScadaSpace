@@ -10,7 +10,7 @@ public sealed class ExpressionException(string message, int position = -1) : For
 }
 
 /// <summary>A bounded interpreted expression compiler. No eval, reflection, file or network access.</summary>
-public sealed class ExpressionEngine(int cacheCapacity = 256)
+public sealed partial class ExpressionEngine(int cacheCapacity = 256)
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, CompiledExpression> _cache = new(StringComparer.Ordinal);
@@ -196,11 +196,12 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
     private sealed class Parser
     {
         private readonly Lexer _lexer;
+        private readonly List<ReferenceOccurrence>? _references;
         private Token _token;
         private int _nodes;
         private int _depth;
         public HashSet<string> Dependencies { get; } = new(StringComparer.Ordinal);
-        public Parser(string source) { _lexer = new(source); _token = _lexer.Next(); }
+        public Parser(string source, List<ReferenceOccurrence>? references = null) { _lexer = new(source); _references = references; _token = _lexer.Next(); }
         private void Next() => _token = _lexer.Next();
         private bool IsSymbol(string text) => _token.Kind == TokenKind.Symbol && _token.Text == text;
         private void Expect(string text) { if (!IsSymbol(text)) throw new ExpressionException($"Expected '{text}'.", _token.Position); Next(); }
@@ -251,6 +252,7 @@ public sealed class ExpressionEngine(int cacheCapacity = 256)
             else if (token.Kind == TokenKind.Name && token.Text.ToLowerInvariant() is "true" or "false" or "null") left = new Literal(token.Text.ToLowerInvariant() switch { "true" => Scalar.From(true), "false" => Scalar.From(false), _ => Scalar.Null });
             else if (token.Kind is TokenKind.Reference or TokenKind.Name)
             {
+                _references?.Add(new(token.Text, token.Position, token.Text.Length + (token.Kind == TokenKind.Reference ? 2 : 0)));
                 Dependencies.Add(token.Text);
                 if (Dependencies.Count > 256) throw new ExpressionException("Too many dependencies.");
                 left = new Reference(token.Text);

@@ -1,1 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include="../ScadaSpace.Core/ScadaSpace.Core.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include="../ScadaSpace.Core/ScadaSpace.Core.csproj" /><ProjectReference Include="../ScadaSpace.Expressions/ScadaSpace.Expressions.csproj" /></ItemGroup></Project>

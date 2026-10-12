@@ -29,6 +29,8 @@ public sealed partial class WorkbenchPage
             {
                 case "cut": Cut(); break; case "copy": Copy(); break; case "paste": Paste(); break;
                 case "duplicate": Duplicate(); break; case "delete": Delete(); break;
+                case "wrap-coordinate": WrapSelectedComponents(); break;
+                case "modify-source": ModifySourceView(); break;
                 case "events": RunDialog(() => ConfigureEventsAsync()); break;
                 case "configurations": RunDialog(OpenConfigurationExplorerAsync); break;
             }
