@@ -81,6 +81,7 @@ with sync_playwright() as p:
         chosen.value.set_files(fixture_file);wait("window.scadaApp.project==='Industrial Symbol Lab'");command('fit')
         page.wait_for_function("names=>names.every(n=>window.scadaViews?.[0]?.components[n]?.symbol?.pictures>0)",arg=names,timeout=30000)
         check('all industrial and existing display symbols render through native Uno',all(symbol(n)['pictures']>0 and symbol(n)['renderError'] is None and symbol(n)['dataError'] is None for n in names))
+        check('native symbol observations distinguish persistent control identities',len({symbol(n)['id'] for n in names})==len(names))
         check('new Sensor and Vessel are real catalog controls',symbol('Sensor')['kind']=='Sensor' and symbol('Vessel')['kind']=='Vessel' and app()['workspace']['paletteButtonsCreated']==35)
         check('design mode never schedules symbol motion',all(not symbol(n)['animating'] and symbol(n)['animationFrames']==0 for n in names))
         # Compare complete serializer output, not omitted fixture defaults with
@@ -115,12 +116,17 @@ with sync_playwright() as p:
         check('horizontal vessels retain typed fill and readout data',symbol('Vessel')['options']['orientation']=='horizontal' and symbol('Vessel')['value']==125 and symbol('Tank')['value']==125)
         click(component('Agitator')['bounds']);click(component('Fill')['bounds']);ticks()
         check('vessel stand agitator and fill settings remain independently applied',not symbol('Vessel')['options']['displayAgitator'] and not symbol('Vessel')['options']['displayFillLevel'] and symbol('Vessel')['options']['displayStand'])
+        pump_identity=symbol('Pump')['id']
         click(component('Broken')['bounds']);wait('window.scadaViews[0].components.Pump.symbol.dataError!==null')
         check('failed symbol bindings show an explicit error instead of stale good animation',not symbol('Pump')['animating'] and 'BadExpression' in symbol('Pump')['dataError'] and symbol('Motor')['dataError'] is None)
         frames=symbol('Pump')['animationFrames'];ticks(4)
         check('failed data stops the affected symbol clock',symbol('Pump')['animationFrames']==frames)
-        click(component('Broken')['bounds']);wait('window.scadaViews[0].components.Pump.symbol.dataError===null && window.scadaViews[0].components.Pump.symbol.animating')
-        check('corrected bindings recover the same native symbol',symbol('Pump')['renderError'] is None and not views()[0]['diagnostics'])
+        rendered_before_recovery=symbol('Pump')['renders']
+        click(component('Broken')['bounds'])
+        # Input evaluation and native drawing are separate observable stages. Require
+        # a successful new draw, not just cleared data errors, before checking recovery.
+        wait('window.scadaViews[0].components.Pump.symbol.dataError===null && window.scadaViews[0].components.Pump.symbol.renderError===null && window.scadaViews[0].components.Pump.symbol.animating && window.scadaViews[0].components.Pump.symbol.renders>'+str(rendered_before_recovery))
+        check('corrected bindings recover the same native symbol',symbol('Pump')['id']==pump_identity and symbol('Pump')['renderError'] is None and not views()[0]['diagnostics'])
         fill('Appearance','invalid');wait('window.scadaViews[0].components.Pump.symbol.dataError!==null')
         check('unknown appearances are diagnosed rather than silently substituted',symbol('Pump')['dataError'] is not None and symbol('Sensor')['dataError'] is not None)
         fill('Appearance','auto');fill('Orientation','right');fill('State','stopped');ticks()
