@@ -123,7 +123,8 @@ public sealed partial class WorkbenchPage : Page, IDisposable
     {
         _runtime.UpdateViews(_document.Project);
         _session.Changed -= SessionChanged; _session.Navigated -= PageNavigated;
-        _session = new(_runtime); _session.Changed += SessionChanged; _session.Navigated += PageNavigated;
+        var symbolDefaults = _session.Symbols;
+        _session = new(_runtime) { Symbols = symbolDefaults }; _session.Changed += SessionChanged; _session.Navigated += PageNavigated;
         if (_sessionMode) _pageHost.Load(_runtime, _session);
         _resources.Reconcile(_document.Project.Views.Select(v => v.Path));
         _componentCount = _document.Project.Views.Sum(v => v.Root.DescendantsAndSelf().Count());

@@ -10,6 +10,6 @@ internal static partial class BrowserServices
         quality = symbol.Quality, options = symbol.Data.Options, tank = symbol.Data.Tank,
         dataError = symbol.DataError, renderError = symbol.RenderError,
         pictures = symbol.PictureBuildCount, renders = symbol.RenderCount,
-        animationFrames = symbol.AnimationInvalidations, animating = symbol.Animating
+        animationFrames = symbol.AnimationInvalidations, animating = symbol.Animating, animationVisible = symbol.IsInAnimationViewport
     };
 }

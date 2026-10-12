@@ -30,7 +30,7 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
     private SymbolData _data = new();
     private SymbolData? _snapshot;
     private readonly SymbolRenderCache _cache = new();
-    private bool _batch, _allowAnimation = true;
+    private bool _batch, _disposed, _allowAnimation = true;
     private Quality _errorQuality = Quality.BadExpression;
     public SymbolData Data { get => _data; set { ArgumentNullException.ThrowIfNull(value); if (_data == value) return; _data = value; Changed(); } }
     public bool AllowAnimation { get => _allowAnimation; set { if (_allowAnimation == value) return; _allowAnimation = value; Changed(); } }
@@ -39,7 +39,7 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
     public long PictureBuildCount => _cache.PictureBuildCount;
     public long RenderCount => _cache.DrawCount;
     public long AnimationInvalidations { get; private set; }
-    public bool Animating => AllowAnimation && IsLoaded && DataError is null && Quality == Quality.Good && Data.Options?.IsAnimated == true && IndustrialSymbolRenderer.Supports(Kind);
+    public bool Animating => !_disposed && AllowAnimation && IsLoaded && DataError is null && Quality == Quality.Good && Data.Options?.IsAnimated == true && IndustrialSymbolRenderer.Supports(Kind);
     public HmiSymbol()
     {
         Loaded += (_, _) => { SymbolAnimation.Update(this); Invalidate(); };
@@ -47,7 +47,7 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
     }
     private void Changed()
     {
-        _snapshot = null; if (_batch) return;
+        _snapshot = null; if (_batch || _disposed) return;
         SymbolAnimation.Update(this); Invalidate();
     }
     public void SetSnapshot(SymbolData data)
@@ -63,15 +63,39 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
         if (DataError == message && _errorQuality == quality) return;
         DataError = message; _errorQuality = quality; AutomationProperties.SetHelpText(this, message ?? ""); Changed();
     }
+    /// <summary>Conservative root/scroll viewport intersection; partially visible symbols are retained.</summary>
+    public bool IsInAnimationViewport
+    {
+        get
+        {
+            if (_disposed || !IsLoaded || XamlRoot is null || ActualWidth <= 0 || ActualHeight <= 0) return false;
+            var left = 0d; var top = 0d; var right = XamlRoot.Size.Width; var bottom = XamlRoot.Size.Height;
+            try
+            {
+                for (DependencyObject? element = this; element is not null; element = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(element))
+                {
+                    if (element is UIElement ui && (ui.Visibility != Visibility.Visible || ui.Opacity <= 0)) return false;
+                    if (element is Microsoft.UI.Xaml.Controls.ScrollViewer scroll)
+                    {
+                        var clip = scroll.TransformToVisual(null).TransformBounds(new Rect(0, 0, scroll.ActualWidth, scroll.ActualHeight));
+                        left = Math.Max(left, clip.Left); top = Math.Max(top, clip.Top);
+                        right = Math.Min(right, clip.Right); bottom = Math.Min(bottom, clip.Bottom);
+                    }
+                }
+                var bounds = TransformToVisual(null).TransformBounds(new Rect(0, 0, ActualWidth, ActualHeight));
+                return right > left && bottom > top && bounds.Right > left && bounds.Left < right && bounds.Bottom > top && bounds.Top < bottom;
+            }
+            catch (InvalidOperationException) { return false; }
+        }
+    }
     internal void AnimateFrame()
     {
-        if (!Animating || ActualWidth <= 0 || ActualHeight <= 0) return;
-        for (DependencyObject? element = this; element is not null; element = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(element))
-            if (element is UIElement ui && (ui.Visibility != Visibility.Visible || ui.Opacity <= 0)) return;
+        if (!Animating || !IsInAnimationViewport) return;
         AnimationInvalidations++; Invalidate();
     }
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
+        if (_disposed) return;
         var bounds = SKRect.Create((float)area.Width, (float)area.Height);
         try
         {
@@ -83,5 +107,5 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
         catch (Exception ex) when (ex is ArgumentException or FormatException or OverflowException)
         { RenderError = ex.Message; SymbolRenderer.DrawQuality(canvas, bounds, Quality.BadExpression); }
     }
-    public new void Dispose() { SymbolAnimation.Remove(this); _cache.Dispose(); }
+    public new void Dispose() { _disposed = true; SymbolAnimation.Remove(this); _cache.Dispose(); }
 }

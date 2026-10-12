@@ -44,6 +44,7 @@ children += [node('Tank','Tank',30,495,180,235,{'value':45,'capacity':200,'warni
              node('Thermometer','Thermometer',515,495,105,235,{'value':45,'minimum':0,'maximum':200},{'value':bind('root.custom.level')}),
              node('LED','LEDDisplay',680,525,180,80,{'value':45,'format':'0.00','unit':'m³'},{'value':bind('root.custom.level')}),
              node('Pipe','Pipe',900,535,150,80,{'value':True,'strokeWidth':12,'color':'#00ACAC'})]
+children.append(node('OffscreenPump','Pump',20,1600,160,200,{'state':'running','appearance':'mimic','animationSpeed':50}))
 root['children']=children
 fixture={'schemaVersion':1,'name':'Industrial Symbol Lab','views':[{'path':'Symbols','width':1100,'height':760,'root':root}], 'pages':[{'path':'/','view':'Symbols'}], 'tags':[], 'alarms':[]}
 fixture_file=OUT/'fixture.json';fixture_file.write_text(json.dumps(fixture))
@@ -78,12 +79,18 @@ with sync_playwright() as p:
         page.wait_for_function('window.scadaApp?.ready && window.scadaApp.tick>2',timeout=120000)
         with page.expect_file_chooser() as chosen:command('import')
         chosen.value.set_files(fixture_file);wait("window.scadaApp.project==='Industrial Symbol Lab'");command('fit')
-        wait("window.scadaViews?.[0]?.components?.Vessel?.symbol?.pictures>0")
+        page.wait_for_function("names=>names.every(n=>window.scadaViews?.[0]?.components[n]?.symbol?.pictures>0)",arg=names,timeout=30000)
         check('all industrial and existing display symbols render through native Uno',all(symbol(n)['pictures']>0 and symbol(n)['renderError'] is None and symbol(n)['dataError'] is None for n in names))
         check('new Sensor and Vessel are real catalog controls',symbol('Sensor')['kind']=='Sensor' and symbol('Vessel')['kind']=='Vessel' and app()['workspace']['paletteButtonsCreated']==35)
         check('design mode never schedules symbol motion',all(not symbol(n)['animating'] and symbol(n)['animationFrames']==0 for n in names))
+        # Compare complete serializer output, not omitted fixture defaults with
+        # explicit inactive fields emitted by the Scalar serializer.
+        with page.expect_download() as event:command('export')
+        event.value.save_as(OUT/'baseline-export.json')
+        baseline=json.loads((OUT/'baseline-export.json').read_text())
         command('preview');wait('window.scadaApp.preview');ticks()
         before={n:symbol(n)['pictures'] for n in names};ticks(5)
+        check('offscreen running symbols do not schedule paint invalidations',not symbol('OffscreenPump')['animationVisible'] and symbol('OffscreenPump')['animationFrames']==0)
         check('idle runtime refreshes reuse every unchanged vector picture',all(symbol(n)['pictures']==before[n] for n in names))
         check('vessel readout uses its independent capacity',symbol('Vessel')['maximum']==200 and symbol('Vessel')['options']['readout']['text']=='22.5%')
         page.screenshot(path=str(OUT/'symbols-mimic.png'),full_page=True)
@@ -132,7 +139,15 @@ with sync_playwright() as p:
         check('reduced motion preserves running state without animation',symbol('Pump')['options']['state']=='running' and not symbol('Pump')['animating'])
         with page.expect_download() as event:command('export')
         event.value.save_as(OUT/'runtime-export.json');exported=json.loads((OUT/'runtime-export.json').read_text())
-        check('runtime symbol preferences and inputs never mutate exported defaults',exported['views'][0]['root']['custom']==fixture['views'][0]['root']['custom'] and not app()['dirty'])
+        check('runtime symbol preferences and inputs never mutate exported defaults',exported==baseline and not app()['dirty'])
+        command('preview');wait('!window.scadaApp.preview')
+        count=app()['componentCount'];command('components-rail');command('palette-search')
+        page.keyboard.insert_text('Sensor');wait('window.scadaApp.workspace.paletteVisibleCount===1')
+        command('palette-item-Sensor');wait('window.scadaApp.componentCount==='+str(count+1))
+        check('session symbol preferences survive a designer transaction',app()['symbolDefaults']['autoAppearance']=='p&id' and app()['symbolDefaults']['reducedMotion'])
+        command('undo');wait('window.scadaApp.componentCount==='+str(count))
+        command('components-rail');command('preview');ticks()
+        check('undo retains local symbol preferences without dirtying project defaults',app()['symbolDefaults']['autoAppearance']=='p&id' and not app()['dirty'] and not symbol('Pump')['animating'])
         page.set_viewport_size({'width':1024,'height':768});ticks(4);command('fit');ticks(3)
         check('all symbol renderers remain valid at tablet dimensions',all(symbol(n)['renderError'] is None and symbol(n)['dataError'] is None for n in names))
         page.screenshot(path=str(OUT/'symbols-tablet.png'),full_page=True)
