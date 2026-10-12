@@ -33,6 +33,7 @@ public sealed partial class SymbolStateEditor : Grid, IDisposable
     public string SelectedState => _selected;
     public string ThemeName => _themeName;
     public string ErrorText => _error.Text;
+    public bool PreviewVisible => _preview.Visibility == Visibility.Visible;
     public bool DeleteConfirmationVisible => _confirmation.Visibility == Visibility.Visible;
     public IReadOnlyDictionary<string, FrameworkElement> Fields { get; }
     public IReadOnlyDictionary<string, HmiSymbol> Previews { get; }
@@ -57,7 +58,7 @@ public sealed partial class SymbolStateEditor : Grid, IDisposable
         var right = new StackPanel { Spacing = 8, Padding = new Thickness(2) };
         var identity = new Grid { ColumnSpacing = 8 }; identity.ColumnDefinitions.Add(new()); identity.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         identity.Children.Add(_name); Grid.SetColumn(_theme, 1); identity.Children.Add(_theme); right.Children.Add(identity);
-        right.Children.Add(_notice);
+        right.Children.Add(_notice); right.Children.Add(_confirmation);
         var assignments = new Grid { ColumnSpacing = 15, Height = 126 }; assignments.ColumnDefinitions.Add(new()); assignments.ColumnDefinitions.Add(new());
         StackPanel Section(string title, UIElement content)
         { var panel = new StackPanel { Spacing = 3 }; panel.Children.Add(ControlTheme.Text(title, 12)); panel.Children.Add(content); return panel; }
@@ -106,15 +107,15 @@ public sealed partial class SymbolStateEditor : Grid, IDisposable
         var confirmButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
         var confirm = ControlTheme.Button("Delete state", () => TryEdit(() => { Draft.Delete(_selected); _confirmation.Visibility = Visibility.Collapsed; Reload("default"); }));
         var cancel = ControlTheme.Button("Keep state", () => _confirmation.Visibility = Visibility.Collapsed);
-        confirmButtons.Children.Add(confirm); confirmButtons.Children.Add(cancel); _confirmation.Children.Add(confirmButtons); right.Children.Add(_confirmation);
+        confirmButtons.Children.Add(confirm); confirmButtons.Children.Add(cancel); _confirmation.Children.Add(confirmButtons); 
         Track("delete-confirm", confirm); Track("delete-cancel", cancel);
-        var scroll = new ScrollViewer { Content = right, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(scroll, 1); Children.Add(scroll);
+        var scroll = new ScrollViewer { Content = right, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(scroll, 1); Children.Add(scroll); Track("settings-scroll", scroll);
         Track("states", _states); Track("search", _search); Track("name", _name); Track("theme", _theme); Track("animation", _animate); Track("flashing", _flash);
         _search.TextChanged += (_, _) => Filter();
         _states.SelectionChanged += (_, _) =>
         {
             if (_sync || _states.SelectedItem is not string next || next == _selected) return;
-            if (!TryEdit(() => { StageCurrent(); _selected = next; _confirmation.Visibility = Visibility.Collapsed; LoadFields(); }))
+            if (!TryEdit(() => { StageCurrent(); _selected = next; _confirmation.Visibility = Visibility.Collapsed; Filter(); LoadFields(); }))
             { _sync = true; _states.SelectedItem = _selected; _sync = false; }
         };
         _theme.SelectionChanged += (_, _) =>
@@ -136,9 +137,9 @@ public sealed partial class SymbolStateEditor : Grid, IDisposable
     }
     private void Filter()
     {
-        _sync = true;
+        var wasSync = _sync; _sync = true;
         try { _states.ItemsSource = Draft.Names.Where(n => n.Contains(_search.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray(); _states.SelectedItem = _selected; }
-        finally { _sync = false; }
+        finally { _sync = wasSync; }
     }
     private void Reload(string selected) { _selected = selected; _sync = true; _search.Text = ""; _sync = false; Filter(); LoadFields(); }
     private void LoadFields()

@@ -40,7 +40,9 @@ jobs:
             dotnet pack "$project" -c Release --no-build -o artifacts/packages
           done
       - name: Verify standalone package consumption
-        run: python tests/packages/verify.py
+        run: |
+          python tests/packages/verify.py
+          python tests/packages/verify_symbol_states.py
       - name: Archive exact source tree
         if: always()
         run: |
@@ -91,6 +93,7 @@ jobs:
           python tests/browser/hierarchy.py
           python tests/browser/styles.py
           python tests/browser/symbols.py
+          python tests/browser/symbol-states.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -106,6 +109,7 @@ jobs:
             TestResults/browser-hierarchy
             TestResults/browser-styles
             TestResults/browser-symbols
+            TestResults/browser-symbol-states
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()

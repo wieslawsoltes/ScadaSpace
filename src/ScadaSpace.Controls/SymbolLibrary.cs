@@ -22,6 +22,7 @@ public sealed partial class SymbolLibrary : Grid, IDisposable
     private readonly Dictionary<string, Grid> _cards = new(StringComparer.Ordinal);
     private readonly SymbolStateCatalog _catalog;
     private bool _sync;
+    private string? _renderedTheme;
     public IReadOnlyDictionary<string, FrameworkElement> Fields { get; }
     public IReadOnlyDictionary<string, HmiSymbol> Symbols { get; }
     public SymbolDefaults Defaults => new((string)_appearance.SelectedItem, _speed.Value, _reduced.IsChecked == true, (string)_theme.SelectedItem);
@@ -36,7 +37,8 @@ public sealed partial class SymbolLibrary : Grid, IDisposable
         settings.Children.Add(_appearance); settings.Children.Add(_state); settings.Children.Add(_theme); settings.Children.Add(_orientation); settings.Children.Add(_vessel);
         settings.Children.Add(ControlTheme.Text("Animation speed (%)", 12)); settings.Children.Add(_speed); settings.Children.Add(_reduced);
         settings.Children.Add(new TextBlock { Text = "State themes are project-defined. Session defaults affect auto symbols. No process values are changed.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
-        Children.Add(new ScrollViewer { Content = settings, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        var settingsScroll = new ScrollViewer { Content = settings, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Children.Add(settingsScroll); _fields.Add("settings-scroll", settingsScroll);
         var gallery = new Grid { ColumnSpacing = 8, RowSpacing = 8, Padding = new Thickness(4) };
         for (var i = 0; i < 3; i++) gallery.ColumnDefinitions.Add(new());
         var kinds = new[] { ("Centrifugal pump", SymbolKind.Pump), ("Vacuum pump", SymbolKind.Pump), ("Motor", SymbolKind.Motor), ("Valve", SymbolKind.Valve), ("Sensor", SymbolKind.Sensor), ("Vessel", SymbolKind.Vessel), ("Cylindrical tank", SymbolKind.Tank), ("Gauge", SymbolKind.Gauge), ("Thermometer", SymbolKind.Thermometer) };
@@ -61,11 +63,12 @@ public sealed partial class SymbolLibrary : Grid, IDisposable
     private void Refresh()
     {
         if (_sync || _state.SelectedItem is not string state || _theme.SelectedItem is not string theme) return;
-        var appearance = (string)_appearance.SelectedItem;
+        var appearance = (string)_appearance.SelectedItem; var themeChanged = _renderedTheme != theme;
         foreach (var (name, symbol) in _symbols)
         {
             var card = _cards[name]; var dark = theme == "dark" && IndustrialSymbolRenderer.Supports(symbol.Kind);
-            card.Background = ControlTheme.Brush(dark ? "#1C2429" : "#FFFFFF"); ((TextBlock)card.Children[0]).Foreground = ControlTheme.Brush(dark ? "#E5E9EC" : "#354B58");
+            if (themeChanged)
+            { card.Background = ControlTheme.Brush(dark ? "#1C2429" : "#FFFFFF"); ((TextBlock)card.Children[0]).Foreground = ControlTheme.Brush(dark ? "#E5E9EC" : "#354B58"); }
             try
             {
                 SymbolOptions? options = null;
@@ -83,6 +86,7 @@ public sealed partial class SymbolLibrary : Grid, IDisposable
             }
             catch (ArgumentException error) { symbol.SetDiagnostic(error.Message); }
         }
+        _renderedTheme = theme;
     }
     public new void Dispose() { foreach (var symbol in _symbols.Values) symbol.Dispose(); }
 }

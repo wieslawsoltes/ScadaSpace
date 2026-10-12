@@ -27,6 +27,7 @@ public sealed partial class WorkbenchPage
         {
             fields = editor.Fields.ToDictionary(p => p.Key, p => bounds(p.Value)),
             selected = editor.SelectedState, theme = editor.ThemeName, error = editor.ErrorText, dirty = editor.Draft.IsDirty,
+            previewVisible = editor.PreviewVisible,
             names = editor.Draft.Names, state = editor.Draft.Catalog.Get(editor.SelectedState), deleteConfirmation = editor.DeleteConfirmationVisible,
             rows = ((IEnumerable<string>)list.ItemsSource).Select(name => new { name, bounds = list.ContainerFromItem(name) is FrameworkElement row ? bounds(row) : null }).ToArray(),
             themeMenu = theme.IsDropDownOpen ? ((IEnumerable<string>)theme.ItemsSource).Select((name, i) => new { name, bounds = theme.ContainerFromIndex(i) is FrameworkElement row ? bounds(row) : null }).ToArray() : null,

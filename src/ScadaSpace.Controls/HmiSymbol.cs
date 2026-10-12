@@ -89,7 +89,13 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
         }
     }
     internal void AnimateFrame()
-    { if (!Animating || !IsInAnimationViewport) return; AnimationInvalidations++; Invalidate(); }
+    {
+        if (!Animating || !IsInAnimationViewport) return;
+        // A flash-only symbol needs a new frame at a color transition, not at 30 Hz.
+        if (Data.Options is { IsAnimated: false } options
+            && options.AlternateFill(SymbolAnimation.ElapsedSeconds) == LastAlternateFill && RenderError is null) return;
+        AnimationInvalidations++; Invalidate();
+    }
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
         if (_disposed) return; var bounds = SKRect.Create((float)area.Width, (float)area.Height);
