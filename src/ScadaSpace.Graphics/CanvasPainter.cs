@@ -7,7 +7,8 @@ public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
 {
     /// <summary>Optional application-owned typeface. Set before drawing and retain it until rendering has stopped.</summary>
     public static SKTypeface? DrawingTypeface { get; set; }
-    public SKCanvas Canvas { get; } = canvas;
+    public SKCanvas Canvas { get; private set; } = canvas;
+    public void Bind(SKCanvas canvas) { ArgumentNullException.ThrowIfNull(canvas); Canvas = canvas; }
     private readonly SKPaint _paint = new() { IsAntialias = true, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
     private readonly SKFont _font = new(DrawingTypeface ?? SKTypeface.Default, 13);
     public static SKColor Color(string value, string fallback = "#415969") => SKColor.TryParse(value, out var color) ? color : SKColor.Parse(fallback);
@@ -28,7 +29,7 @@ public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
     public void Polygon(SKColor color, params SKPoint[] points)
     {
         if (points.Length == 0) return;
-        using var path = new SKPath(); path.MoveTo(points[0]); foreach (var point in points.Skip(1)) path.LineTo(point); path.Close(); Path(path, color);
+        using var path = new SKPath(); path.MoveTo(points[0]); for (var i = 1; i < points.Length; i++) path.LineTo(points[i]); path.Close(); Path(path, color);
     }
     public void Arc(SKRect rect, float startAngle, float sweep, SKColor color, float width)
     { using var path = new SKPath(); path.AddArc(rect, startAngle, sweep); Path(path, color, true, width); }
