@@ -81,7 +81,7 @@ public sealed partial class StyleClassEditor : Grid
         tools.ColumnDefinitions.Add(new()); tools.ColumnDefinitions.Add(new()); tools.RowDefinitions.Add(new()); tools.RowDefinitions.Add(new());
         void Tool(string id, string label, int row, int column, Action action)
         {
-            var button = ControlTheme.Button(label, () => TryEdit(action)); Grid.SetRow(button, row); Grid.SetColumn(button, column); tools.Children.Add(button); Track(id, button);
+            var button = ControlTheme.Button(label, () => TryEdit(action)); button.HorizontalAlignment = HorizontalAlignment.Stretch; Grid.SetRow(button, row); Grid.SetColumn(button, column); tools.Children.Add(button); Track(id, button);
         }
         Tool("create", "New", 0, 0, () => { CommitCurrent(); _draft.Create(_name.Text); Select(_name.Text); });
         Tool("duplicate", "Duplicate", 0, 1, () => { CommitCurrent(); if (_selected is null) throw new InvalidOperationException("Select a style class first."); _draft.Create(_name.Text, _draft.Properties(_selected)); Select(_name.Text); });

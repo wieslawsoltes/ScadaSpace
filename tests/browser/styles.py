@@ -47,6 +47,17 @@ with sync_playwright() as p:
         if text is not None:
             page.keyboard.press('Control+a');page.keyboard.press('Backspace')
             if text:page.keyboard.insert_text(text)
+            if name=='filter':
+                # A matching item can retain old bounds while the filtered list is
+                # re-expanded. Require the complete projection and ordered native rows.
+                page.wait_for_function("""text=>{
+                    const e=window.scadaApp.styleEditor;
+                    if(!e)return false;
+                    const expected=e.classes.filter(n=>n.toLowerCase().includes(text.toLowerCase()));
+                    const rows=e.rows;
+                    return rows.length===expected.length && rows.every((r,i)=>r.name===expected[i]
+                        && r.bounds?.width>0 && (!i || r.bounds.y>=rows[i-1].bounds.y+rows[i-1].bounds.height-1));
+                }""",arg=text,timeout=30000)
     def choose(name):
         page.wait_for_function('n=>window.scadaApp.styleEditor?.rows?.some(r=>r.name===n&&r.bounds?.width>0)',arg=name,timeout=30000)
         click(next(r['bounds'] for r in editor()['rows'] if r['name']==name))
@@ -82,6 +93,7 @@ with sync_playwright() as p:
         check('Project menu opens the native style class list and grouped editor',editor()['selected']=='Alpha' and editor()['classes']==['Alpha','Zulu'])
         choose('Zulu');field('foreground','#775511');wait("window.scadaApp.styleEditor.previewForeground==='#FF775511'")
         check('valid style field changes update the native preview without changing the document',native('Styled')['foreground']=='#FFAA2233' and not app()['dirty'])
+        check('color and inheritance buttons retain usable native hit targets',editor()['inputs']['foreground']['controls']['color']['width']>=24 and editor()['inputs']['foreground']['controls']['reset']['width']>=24)
         option('fontWeight','Bold');wait('window.scadaApp.styleEditor.previewFontWeight===700')
         check('native font-weight choices update only the staged preview',not app()['dirty'] and editor()['inputs']['fontWeight']['text']=='Bold')
         auxiliary('fontWeight','reset');wait('window.scadaApp.styleEditor.previewFontWeight===400')

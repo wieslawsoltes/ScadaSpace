@@ -91,11 +91,13 @@ public sealed partial class StyleValueEditor : UserControl
         {
             _layout.ColumnDefinitions.Add(new() { Width = new GridLength(27) });
             _swatch = ControlTheme.Button("…", () => OpenColorPicker());
-            _swatch.Padding = new Thickness(1); _swatch.MinWidth = 0;
+            _swatch.Padding = new Thickness(1); _swatch.MinWidth = 0; _swatch.Width = 27;
+            _swatch.HorizontalAlignment = HorizontalAlignment.Stretch;
             Grid.SetColumn(_swatch, 1); _layout.Children.Add(_swatch); Track("color", _swatch, "Choose " + property.Name + " color");
         }
         _layout.ColumnDefinitions.Add(new() { Width = new GridLength(25) });
-        var reset = ControlTheme.Button("×", () => Text = ""); reset.Padding = new Thickness(1); reset.MinWidth = 0;
+        var reset = ControlTheme.Button("×", () => Text = ""); reset.Padding = new Thickness(1); reset.MinWidth = 0; reset.Width = 25;
+        reset.HorizontalAlignment = HorizontalAlignment.Stretch;
         Grid.SetColumn(reset, _layout.ColumnDefinitions.Count - 1); _layout.Children.Add(reset); Track("reset", reset, "Inherit " + property.Name);
         UpdateSwatch();
         Unloaded += (_, _) => _flyout?.Hide();

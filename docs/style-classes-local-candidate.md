@@ -1,3 +1,5 @@
+> Historical local-candidate record. Source publication resumed in PR #10; see [current style documentation](style-classes.md) and the exact-revision Actions reports for current validation. The uncompiled/unpublished status below describes the earlier recovery session, not a later validated release.
+
 # Style class workflows — local, unverified candidate
 
 ## Publication and validation status
