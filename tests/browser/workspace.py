@@ -52,7 +52,7 @@ with sync_playwright() as p:
         command('components-rail'); wait('window.scadaApp.workspace.paletteVisible')
         count=workspace()['paletteButtonsCreated']
         fill('palette-search','Tank')
-        check('palette search reveals matching components without recreating buttons', workspace()['paletteVisibleCount']==1 and workspace()['paletteButtonsCreated']==count==33 and bounds('palette-item-Tank') is not None)
+        check('palette search reveals matching components without recreating buttons', workspace()['paletteVisibleCount']==1 and workspace()['paletteButtonsCreated']==count==35 and bounds('palette-item-Tank') is not None)
         fill('palette-search',''); command('palette-collapse')
         check('palette category collapse hides native component rows', workspace()['paletteVisibleCount']==0)
         fill('palette-search','Label')
@@ -60,7 +60,7 @@ with sync_playwright() as p:
         fill('palette-search','')
         check('clearing search restores category expansion choices', workspace()['paletteVisibleCount']==0)
         command('palette-expand'); command('palette-mode')
-        check('tile display reuses every existing component button', workspace()['panels']['paletteTiles'] and workspace()['paletteButtonsCreated']==count and workspace()['paletteVisibleCount']==33)
+        check('tile display reuses every existing component button', workspace()['panels']['paletteTiles'] and workspace()['paletteButtonsCreated']==count and workspace()['paletteVisibleCount']==35)
         command('components-pane-pin')
         check('pinning reserves a persistent component pane and hides its edge rail', workspace()['panels']['componentsPinned'] and workspace()['paletteVisible'] and bounds('components-rail') is None and bounds('property-pane-close')['y']>bounds('components-pane-pin')['y'])
         page.screenshot(path=str(OUT/'pinned-palette.png'),full_page=True)

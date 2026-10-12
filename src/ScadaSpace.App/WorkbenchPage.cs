@@ -86,7 +86,7 @@ public sealed partial class WorkbenchPage : Page, IDisposable
         };
         Unloaded += (_, _) => { _timer.Stop(); FlushPanelPreferences(); };
     }
-    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); InitializeStyleTools(); InitializeHierarchyCommands(); }
+    private void BuildUi() { BuildDesignerUi(); InitializeConfigurationTools(); InitializeStyleTools(); InitializeSymbolTools(); InitializeHierarchyCommands(); }
     private void AddMenu(MenuBar menu, string title, params (string Text, Action Action)[] items)
     {
         var group = new MenuBarItem { Title = title, FontSize = 12, MinHeight = 0, Padding = new Thickness(6, 0, 6, 0) };

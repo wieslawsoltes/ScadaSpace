@@ -85,6 +85,8 @@ public sealed partial class WorkbenchPage
             },
             inspector = _inspector.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             hierarchy = new { builds = _document.HierarchyBuildCount, layoutBuilds = _surface.LayoutBuildCount, sourceError = _sourceViewError, restoreErrors = _document.RestoreDiagnostics },
+            symbolLibrary = SymbolLibraryTelemetry(Bounds),
+            symbolDefaults = _session.Symbols,
             workspace = new { active = _resources.ActiveView, open = _resources.OpenViews, panels = _panels, paletteOpen = _paletteOpen, paletteVisible = _componentPane.Visibility == Visibility.Visible, paletteButtonsCreated = _palette.CreatedButtonCount, paletteVisibleCount = _palette.VisibleComponentCount, tabsCreated = _viewTabs.CreatedTabCount, explorerNodesCreated = _explorerNodesCreated, explorerNodes = _explorerNodes.Count },
             eventEditor = _eventEditor is null ? null : new { fields = _eventEditor.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), activeEvent = _eventEditor.ActiveEvent, selected = _eventEditor.SelectedAction, count = _eventEditor.ActionCount, error = _eventEditor.ErrorText, dirty = _eventEditor.Draft.IsDirty },
             configurationExplorer = _configurationExplorer is null ? null : new { fields = _configurationExplorer.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)), count = _configurationExplorer.Rows.Count, selected = _configurationExplorer.Selected, kindMenu = ConfigurationKindMenu(), builds = _configurationIndex.BuildCount, queries = _configurationIndex.QueryBuildCount },

@@ -72,17 +72,7 @@ public partial class ViewHost : Canvas, IDisposable
         }
         else if (Enum.TryParse<SymbolKind>(node.Type, out var kind))
         {
-            var symbol = new HmiSymbol { Kind = kind };
-            _refresh.Add(() =>
-            {
-                var value = node.Props.ContainsKey("value") || node.Bindings.ContainsKey("value") ? Read(node, "value") : QualifiedValue.Good(Scalar.From(0), DateTimeOffset.UtcNow);
-                symbol.Value = Number(node, "value"); symbol.Quality = value.Quality;
-                symbol.Minimum = Number(node, "minimum"); symbol.Maximum = Number(node, "maximum", 100); symbol.Unit = Text(node, "unit");
-                symbol.SymbolColor = Text(node, "color", "#48AFC0");
-                symbol.Data = new(Format: Text(node, "format", "0.0"), Route: Text(node, "route", "elbow"), StrokeWidth: Number(node, "strokeWidth", 1), Stroke: Text(node, "stroke", "#9DAAB2"), Radius: Number(node, "radius"), Warning: Number(node, "warning", 85));
-                symbol.Invalidate();
-            });
-            element = symbol;
+            element = BuildSymbol(node, kind);
         }
         else switch (node.Type)
         {
@@ -183,7 +173,7 @@ public partial class ViewHost : Canvas, IDisposable
         return ComponentStyle.Apply(element, style);
     }
     public new void Dispose()
-    { foreach (var host in _embedded) host.Dispose(); _embedded.Clear(); _refresh.Clear(); Instance = null; }
+    { foreach (var symbol in _elements.Values.OfType<HmiSymbol>()) symbol.Dispose(); foreach (var host in _embedded) host.Dispose(); _embedded.Clear(); _refresh.Clear(); Instance = null; }
     private partial class ModelPanel(ComponentNode node) : Canvas
     {
         private readonly Dictionary<string, FrameworkElement> _children = new(StringComparer.Ordinal);
