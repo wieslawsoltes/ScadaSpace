@@ -62,6 +62,7 @@ public partial class ViewHost : Canvas, IDisposable
     }
     private FrameworkElement BuildNode(ComponentNode node)
     {
+        var style = Runtime!.Styles.Resolve(node).Values;
         FrameworkElement element;
         if (node.Type == "Container")
         {
@@ -87,7 +88,17 @@ public partial class ViewHost : Canvas, IDisposable
         {
             case "Label":
                 var label = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-                _refresh.Add(() => { var value = Read(node, "text"); label.Text = value.IsGood ? value.Value.ToString() : "⚠ " + value.Quality; label.FontSize = Math.Clamp(Number(node, "fontSize", 14), 6, 200); label.Foreground = ControlTheme.Brush(Text(node, "foreground", "#354B58")); });
+                string? previousForeground = null;
+                _refresh.Add(() =>
+                {
+                    var value = Read(node, "text"); label.Text = value.IsGood ? value.Value.ToString() : "⚠ " + value.Quality;
+                    if (!style.ContainsKey("fontSize")) label.FontSize = Math.Clamp(Number(node, "fontSize", 14), 6, 200);
+                    if (!style.ContainsKey("foreground"))
+                    {
+                        var foreground = Text(node, "foreground", "#354B58");
+                        if (foreground != previousForeground) { label.Foreground = ControlTheme.Brush(foreground); previousForeground = foreground; }
+                    }
+                });
                 element = label; break;
             case "Progress":
                 var progress = new ProgressBar { VerticalAlignment = VerticalAlignment.Center, MinHeight = 12 };
@@ -169,16 +180,7 @@ public partial class ViewHost : Canvas, IDisposable
         if (node.Events.ContainsKey("onDoubleClick")) element.DoubleTapped += (_, _) => Action(node, "onDoubleClick");
         if (node.Events.ContainsKey("onContextMenu")) element.RightTapped += (_, _) => Action(node, "onContextMenu");
         _elements[node.Id] = element;
-        var style = new Dictionary<string, Scalar>(StringComparer.Ordinal);
-        foreach (var className in node.StyleClasses) if (Runtime!.Project.Styles.TryGetValue(className, out var values)) foreach (var pair in values) style[pair.Key] = pair.Value;
-        foreach (var pair in node.Style) style[pair.Key] = pair.Value;
-        if (style.TryGetValue("opacity", out var opacity)) element.Opacity = Math.Clamp(opacity.AsNumber(), 0, 1);
-        if (style.TryGetValue("background", out var background))
-        {
-            var border = new Border { Child = element, Background = ControlTheme.Brush(background.ToString()), BorderThickness = new Thickness(style.GetValueOrDefault("borderWidth", Scalar.From(1)).AsNumber()), BorderBrush = ControlTheme.Brush(style.GetValueOrDefault("borderColor", Scalar.From("#D5E0E5")).ToString()), CornerRadius = new CornerRadius(style.GetValueOrDefault("cornerRadius").Kind == ScalarKind.Number ? style["cornerRadius"].Number : 0), IsHitTestVisible = !IsEditing };
-            return border;
-        }
-        return element;
+        return ComponentStyle.Apply(element, style);
     }
     public new void Dispose()
     { foreach (var host in _embedded) host.Dispose(); _embedded.Clear(); _refresh.Clear(); Instance = null; }

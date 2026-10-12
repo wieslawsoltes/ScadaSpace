@@ -10,6 +10,7 @@ public sealed class ProjectRuntime : IDisposable
 {
     public ProjectDefinition Project { get; private set; }
     public AuditLog Audit { get; } = new();
+    public StyleResolver Styles { get; private set; }
     public TagStore Tags { get; }
     public Historian History { get; }
     public HistoryQueryCache HistoryQueries { get; }
@@ -19,10 +20,15 @@ public sealed class ProjectRuntime : IDisposable
     {
         var errors = ProjectCodec.Validate(project);
         if (errors.Count > 0) throw new ArgumentException(string.Join("; ", errors.Select(x => x.Message)));
-        Project = project; Tags = new(project.Tags, Audit, clock); History = new(Tags); HistoryQueries = new(History); Alarms = new(Tags, project.Alarms, Audit, clock);
+        Project = project; Styles = new(project.Styles); Tags = new(project.Tags, Audit, clock); History = new(Tags); HistoryQueries = new(History); Alarms = new(Tags, project.Alarms, Audit, clock);
     }
     public ViewInstance CreateView(string path, IReadOnlyDictionary<string, Scalar>? parameters = null) => new ViewInstance(Project.Views.First(v => v.Path == path), Tags, parameters, Expressions).WithHistory(History, HistoryQueries);
-    public void UpdateViews(ProjectDefinition project) => Project = project;
+    public void UpdateViews(ProjectDefinition project)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        var styles = Styles.MatchesCatalog(project.Styles) ? Styles : new StyleResolver(project.Styles);
+        Project = project; Styles = styles;
+    }
     public void Dispose() { Alarms.Dispose(); History.Dispose(); }
 }
 

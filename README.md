@@ -78,7 +78,7 @@ The **Pages** editor configures routes such as `/equipment/:equipment`, primary 
 
 ## Hierarchical Tree controls
 
-The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virtualized Uno control. They support hierarchical expansion, filtered ancestors, keyboard navigation, multi-selection, typed contextual data, bound selection, and stable optional item IDs. Local tag browsing groups the existing memory provider by provider and folder; it does not connect to a Gateway or discover devices. See [Tree APIs and configuration](docs/trees.md) for behavior and limits.
+The **Tree** and **Tag Browse Tree (local)** palette entries use a reusable virtualized Uno control. They support hierarchical expansion, filtered ancestors, keyboard/multi-selection, typed contextual data, bound selection, and stable optional item IDs. Local tag browsing groups the existing memory provider by provider and folder; it does not connect to a Gateway or discover devices. See [Tree APIs and configuration](docs/trees.md) for behavior and limits.
 
 ## Designer workspace
 
@@ -103,3 +103,7 @@ Ignition and Perspective are trademarks of Inductive Automation. This project is
 ## License
 
 MIT for ScadaSpace source. Referenced packages retain their respective licenses.
+
+## Style classes
+
+**Project → Style Classes…** and Project Browser style resources open a native editor with grouped properties, typed options, a cancellable alpha-aware color picker, class preview, assignments and reference-aware rename/delete. Apply, OK and Cancel stage changes through the normal undo/redo transaction. Class values resolve alphabetically; inline values win. See [style APIs, editor behavior and validation boundaries](docs/style-classes.md).

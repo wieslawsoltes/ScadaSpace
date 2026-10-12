@@ -87,6 +87,7 @@ jobs:
           python tests/browser/workspace.py
           python tests/browser/events.py
           python tests/browser/hierarchy.py
+          python tests/browser/styles.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -100,6 +101,7 @@ jobs:
             TestResults/browser-workspace
             TestResults/browser-events
             TestResults/browser-hierarchy
+            TestResults/browser-styles
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()

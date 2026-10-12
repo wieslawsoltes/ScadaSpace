@@ -27,6 +27,26 @@ public sealed partial class WorkbenchPage
                 name, bounds = combo.ContainerFromIndex(index) is FrameworkElement item ? Bounds(item) : null
             }).ToArray();
         }
+        object? StyleClassRows()
+        {
+            if (_styleEditor?.EditorFields["classes"] is not ListView list) return null;
+            return ((IEnumerable<string>)list.ItemsSource).Select(name => new
+            {
+                name, bounds = list.ContainerFromItem(name) is FrameworkElement item ? Bounds(item) : null
+            }).ToArray();
+        }
+        object? StyleInputStates()
+        {
+            if (_styleEditor is null) return null;
+            return _styleEditor.ValueEditors.ToDictionary(pair => pair.Key, pair => new
+            {
+                text = pair.Value.Text, colorOpen = pair.Value.IsColorFlyoutOpen, colorError = pair.Value.ColorError,
+                controls = pair.Value.AuxiliaryControls.ToDictionary(p => p.Key, p => Bounds(p.Value)),
+                options = pair.Value.InputElement is ComboBox { IsDropDownOpen: true } combo
+                    ? ((IEnumerable<string>)combo.ItemsSource).Select((name, index) => new
+                    { name, bounds = combo.ContainerFromIndex(index) is FrameworkElement item ? Bounds(item) : null }).ToArray() : null
+            }, StringComparer.Ordinal);
+        }
         var controls = _commands.ToDictionary(p => p.Key, p => Bounds(p.Value), StringComparer.Ordinal);
         if (_inspector.EventConfigurationButton is { } eventButton) controls["inspector-configure-events"] = Bounds(eventButton);
         foreach (var pair in _viewTabs.OpenButtons) controls["view-" + pair.Key] = Bounds(pair.Value);
@@ -42,10 +62,27 @@ public sealed partial class WorkbenchPage
         foreach (var node in ActiveHost.Instance?.View.Root.DescendantsAndSelf() ?? Enumerable.Empty<ComponentNode>())
         {
             if (!ActiveHost.Elements.TryGetValue(node.Id, out var element)) continue;
-            components[node.Name] = new { id = node.Id, type = node.Type, x = node.X, y = node.Y, width = node.Width, height = node.Height, bounds = Bounds(element), parentId = _document.FindParent(node.Id)?.Id, text = node.Props.ContainsKey("text") || node.Bindings.ContainsKey("text") ? ActiveHost.Read(node, "text") : (QualifiedValue?)null, value = node.Props.ContainsKey("value") || node.Bindings.ContainsKey("value") ? ActiveHost.Read(node, "value") : (QualifiedValue?)null };
+            components[node.Name] = new { id = node.Id, type = node.Type, x = node.X, y = node.Y, width = node.Width, height = node.Height, bounds = Bounds(element),
+                nativeStyle = element is TextBlock textBlock ? new
+                {
+                    foreground = (textBlock.Foreground as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color.ToString(),
+                    fontSize = textBlock.FontSize, fontWeight = textBlock.FontWeight.Weight,
+                    alignment = textBlock.TextAlignment.ToString(), opacity = (textBlock.Parent as Border)?.Opacity ?? textBlock.Opacity
+                } : null, parentId = _document.FindParent(node.Id)?.Id, text = node.Props.ContainsKey("text") || node.Bindings.ContainsKey("text") ? ActiveHost.Read(node, "text") : (QualifiedValue?)null, value = node.Props.ContainsKey("value") || node.Bindings.ContainsKey("value") ? ActiveHost.Read(node, "value") : (QualifiedValue?)null };
         }
         BrowserServices.SetTelemetry(new
         {
+            styleEditor = _styleEditor is null ? null : new
+            {
+                fields = _styleEditor.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
+                selected = _styleEditor.SelectedClass, classes = _styleEditor.Draft.Names, rows = StyleClassRows(), error = _styleEditor.ErrorText,
+                inputs = StyleInputStates(), previewVisible = _styleEditor.Preview.Visibility == Visibility.Visible,
+                previewFontSize = _styleEditor.PreviewText.FontSize,
+                previewFontWeight = _styleEditor.PreviewText.FontWeight.Weight,
+                previewFontStyle = _styleEditor.PreviewText.FontStyle.ToString(),
+                previewForeground = (_styleEditor.PreviewText.Foreground as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color.ToString(),
+                previewOpacity = _styleEditor.Preview.Opacity
+            },
             inspector = _inspector.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             hierarchy = new { builds = _document.HierarchyBuildCount, layoutBuilds = _surface.LayoutBuildCount, sourceError = _sourceViewError, restoreErrors = _document.RestoreDiagnostics },
             workspace = new { active = _resources.ActiveView, open = _resources.OpenViews, panels = _panels, paletteOpen = _paletteOpen, paletteVisible = _componentPane.Visibility == Visibility.Visible, paletteButtonsCreated = _palette.CreatedButtonCount, paletteVisibleCount = _palette.VisibleComponentCount, tabsCreated = _viewTabs.CreatedTabCount, explorerNodesCreated = _explorerNodesCreated, explorerNodes = _explorerNodes.Count },
