@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from native_readiness import wait_command_bounds
 
 OUT = Path("TestResults/browser-pages")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -67,7 +68,7 @@ with sync_playwright() as p:
     def click(bounds):
         assert bounds and bounds["width"] > 0 and bounds["height"] > 0, "Missing UI bounds"
         page.mouse.click(bounds["x"] + bounds["width"] / 2, bounds["y"] + bounds["height"] / 2)
-    def command(name): click(app()["controls"][name]); page.wait_for_timeout(350)
+    def command(name): click(wait_command_bounds(page, name)); page.wait_for_timeout(350)
     def dock(name): return next(d for d in app()["page"]["docks"] if d["id"] == name)
     def component(name, owner=None): return dock(owner)["components"][name] if owner else app()["components"][name]
     def press(name, owner=None):

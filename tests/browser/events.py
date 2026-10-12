@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from native_readiness import wait_command_bounds
 
 OUT = Path('TestResults/browser-events'); OUT.mkdir(parents=True, exist_ok=True)
 BASE = os.environ.get('SCADASPACE_URL', 'http://127.0.0.1:8765/ScadaSpace/')
@@ -38,8 +39,7 @@ with sync_playwright() as p:
         assert box and box['width']>0 and box['height']>0,'Native control is not arranged'
         page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2,button=button)
     def command(name):
-        page.wait_for_function('key=>window.scadaApp.controls[key]?.width>0',arg=name,timeout=30000)
-        click(app()['controls'][name]); page.wait_for_timeout(150)
+        click(wait_command_bounds(page, name)); page.wait_for_timeout(150)
     def component(name, button='left'):
         page.wait_for_function('name=>window.scadaApp.components[name]?.bounds?.width>0',arg=name,timeout=30000)
         click(app()['components'][name]['bounds'],button)

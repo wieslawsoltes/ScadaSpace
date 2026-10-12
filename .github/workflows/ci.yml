@@ -84,7 +84,7 @@ jobs:
           mkdir -p artifacts/site
           ln -s "$PWD/artifacts/browser/wwwroot" artifacts/site/ScadaSpace
           python -m http.server 8765 --bind 127.0.0.1 --directory artifacts/site > artifacts/server.log 2>&1 &
-          python tests/browser/run_all.py --workers 2
+          python tests/browser/run_all.py --workers 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
