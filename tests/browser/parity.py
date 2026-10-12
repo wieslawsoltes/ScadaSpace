@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from native_readiness import wait_command_bounds
 
 OUT = Path("TestResults/browser-parity")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -65,14 +66,14 @@ with sync_playwright() as p:
         assert box and box["width"] > 0, "Missing rendered bounds"
         page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
     def command(name):
-        click_box(state()["controls"][name]); page.wait_for_timeout(400)
+        click_box(wait_command_bounds(page, name)); page.wait_for_timeout(400)
     def enter(name, value, instance=0):
         click_box(views()[instance]["components"][name]["bounds"])
         page.keyboard.press("Control+a"); page.keyboard.insert_text(str(value)); page.keyboard.press("Enter"); page.wait_for_timeout(500)
     def number(name, instance=0): return views()[instance]["components"][name]["value"]["value"]["number"]
     try:
         page.goto(BASE, wait_until="domcontentloaded", timeout=120000)
-        page.wait_for_function("window.scadaApp?.ready && window.scadaApp.tick > 2", timeout=120000)
+        page.wait_for_function("window.scadaApp?.ready && window.scadaApp.tick > 2 && window.scadaViews?.[0]?.components.Header?.symbol?.renders > 0", timeout=120000)
         with page.expect_file_chooser() as chooser:
             command("import")
         chooser.value.set_files(fixture_path)
