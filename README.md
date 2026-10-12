@@ -111,3 +111,7 @@ MIT for ScadaSpace source. Referenced packages retain their respective licenses.
 ## Style classes
 
 **Project → Style Classes…** and Project Browser style resources open a native editor with grouped properties, typed options, a cancellable alpha-aware color picker, class preview, assignments and reference-aware rename/delete. Apply, OK and Cancel stage changes through the normal undo/redo transaction. Class values resolve alphabetically; inline values win. See [style APIs, editor behavior and validation boundaries](docs/style-classes.md).
+
+## Project symbol states
+
+**Project → Symbol States…** configures project-owned light/dark materials, applied symbol families, and independent motion/flashing. The native editor includes typed colors, paused family previews, Add/Duplicate/Delete, per-theme Undo/Reset, and transactional Apply/OK/Cancel. **Tools → Symbol Library…** selects the session's symbol theme and reduced-motion preference. Flash-only symbols retain two vector pictures and repaint at color transitions. Existing explicit vessel liquid colors remain overrides; new vessels inherit state colors. See [state authoring, reusable APIs and validation boundaries](docs/symbol-states.md).

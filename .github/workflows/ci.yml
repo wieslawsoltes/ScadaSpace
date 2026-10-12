@@ -33,6 +33,7 @@ jobs:
           dotnet run --project tests/ScadaSpace.Graphics.Tests -c Release
           dotnet run --project tests/ScadaSpace.SymbolThemes.Tests -c Release
           node --test --test-reporter=tap tests/browser/navigation-adapter.test.cjs > TestResults/navigation-adapter.tap
+          python tests/browser/test_runner.py
       - name: Pack reusable engine libraries
         run: |
           for project in src/*/*.csproj; do
@@ -83,17 +84,7 @@ jobs:
           mkdir -p artifacts/site
           ln -s "$PWD/artifacts/browser/wwwroot" artifacts/site/ScadaSpace
           python -m http.server 8765 --bind 127.0.0.1 --directory artifacts/site > artifacts/server.log 2>&1 &
-          python tests/browser/smoke.py
-          python tests/browser/parity.py
-          python tests/browser/pages.py
-          python tests/browser/trees.py
-          python tests/browser/history.py
-          python tests/browser/workspace.py
-          python tests/browser/events.py
-          python tests/browser/hierarchy.py
-          python tests/browser/styles.py
-          python tests/browser/symbols.py
-          python tests/browser/symbol-states.py
+          python tests/browser/run_all.py --workers 2
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -110,6 +101,7 @@ jobs:
             TestResults/browser-styles
             TestResults/browser-symbols
             TestResults/browser-symbol-states
+            TestResults/browser-runs
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()
