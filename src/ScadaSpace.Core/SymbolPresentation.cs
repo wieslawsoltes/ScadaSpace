@@ -36,6 +36,7 @@ public sealed record SymbolOptions
     public bool DisplayFillLevel { get; init; } = true;
     public double LiquidOpacity { get; init; } = .7;
     public string LiquidColor { get; init; } = "#00ACAC";
+    public bool UseStateLiquidColor { get; init; } = true;
     public string LiquidWarningColor { get; init; } = "#D88837";
     public SymbolText Label { get; init; } = new();
     public SymbolText Readout { get; init; } = new();
@@ -116,12 +117,16 @@ public static class SymbolPresentation
             if (!double.IsFinite(capacity) || capacity <= 0) throw new ArgumentException("Vessel capacity must be positive.");
             readout = readout with { Text = NumericInputText.FormatDouble(displayPercent.Boolean ? Fraction(n, 0, capacity) * 100 : n) + (displayPercent.Boolean ? "%" : "") };
         }
+        var liquid = read("liquidColor");
+        var useStateLiquid = liquid.Kind == ScalarKind.Null;
+        var liquidColor = useStateLiquid ? stateStyle?.TertiaryColor ?? "#00ACAC"
+            : liquid.Kind == ScalarKind.String ? liquid.Text! : throw new ArgumentException("liquidColor requires a string.");
         var result = new SymbolOptions
         {
             Appearance = appearance, State = state, StateStyle = stateStyle, AnimationSpeed = defaults.ReducedMotion ? 0 : animation,
             Orientation = Text("orientation", type == "Vessel" ? "vertical" : "right"), Variant = Text("variant", "centrifugal"), Feet = Text("feet", "bottom"),
             ReverseFlow = Flag("reverseFlow", false), DisplayStand = Flag("displayStand", true), DisplayAgitator = Flag("displayAgitator", true), DisplayFillLevel = Flag("displayFillLevel", true),
-            LiquidOpacity = Number("liquidOpacity", .7), LiquidColor = Text("liquidColor", stateStyle?.TertiaryColor ?? "#00ACAC"), LiquidWarningColor = Text("liquidWarningColor", "#D88837"), Label = label, Readout = readout
+            LiquidOpacity = Number("liquidOpacity", .7), LiquidColor = liquidColor, UseStateLiquidColor = useStateLiquid, LiquidWarningColor = Text("liquidWarningColor", "#D88837"), Label = label, Readout = readout
         };
         result.Validate(type); return result;
     }

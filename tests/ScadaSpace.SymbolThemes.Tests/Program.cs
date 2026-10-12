@@ -89,6 +89,14 @@ Check("flashing playback does not allocate pictures or brushes per frame", () =>
     var json = JsonSerializer.Serialize(report); Console.WriteLine("THEME_PERFORMANCE " + json); File.WriteAllText("TestResults/symbol-themes/performance.json", json);
     Assert(allocated < 128000 && cache.PictureBuildCount == 1 && cache.RetainedPictureCount == 2);
 });
+Check("explicit vessel liquid overrides preserve their actual pixels under state themes", () =>
+{
+    using var cache = new SymbolRenderCache(); var data = Data(SymbolKind.Vessel);
+    data = data with { Options = data.Options! with { LiquidColor = "#E15F22", UseStateLiquidColor = false, LiquidOpacity = 1, DisplayAgitator = false } };
+    using var pixels = Pixels(SymbolKind.Vessel, data, cache, 0);
+    Assert(pixels.Pixels.Count(p => p == SKColor.Parse("#E15F22")) > 30);
+    Assert(Hash(SymbolKind.Vessel, data, cache, 0) != Hash(SymbolKind.Vessel, data with { Options = data.Options! with { UseStateLiquidColor = true } }, cache, 0));
+});
 Check("render primary and alternate theme contact sheet", () =>
 {
     using var typeface = SKTypeface.FromFamilyName("DejaVu Sans"); CanvasPainter.DrawingTypeface = typeface;

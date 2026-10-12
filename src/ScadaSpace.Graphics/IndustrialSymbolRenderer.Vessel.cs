@@ -18,7 +18,8 @@ public static partial class IndustrialSymbolRenderer
         var c = StateColor(o); var horizontal = o.Orientation == "horizontal";
         using var body = VesselPath(horizontal, o.Appearance); Shape(p, body, c, o.Appearance == "mimic");
         var fraction = (float)SymbolPresentation.Fraction(data.Value, data.Minimum, data.Maximum);
-        var fluid = Color(data.Value >= data.Warning ? o.LiquidWarningColor : o.StateStyle?.TertiaryColor ?? o.LiquidColor);
+        var fluid = Color(data.Value >= data.Warning ? o.LiquidWarningColor
+            : o.UseStateLiquidColor && o.StateStyle is { } style ? style.TertiaryColor : o.LiquidColor);
         if (o.DisplayFillLevel && o.LiquidOpacity > 0 && fraction > 0 && data.Quality == Quality.Good)
         {
             var save = p.Canvas.Save();
