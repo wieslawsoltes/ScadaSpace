@@ -14,6 +14,7 @@ public static partial class SymbolRenderer
         _ = SymbolPresentation.Fraction(data.Value, data.Minimum, data.Maximum);
         if (!double.IsFinite(data.StrokeWidth) || data.StrokeWidth is < 0 or > 1024 || !double.IsFinite(data.Radius) || data.Radius is < 0 or > 32768 || !double.IsFinite(data.Warning)) throw new ArgumentException("Invalid stroke, radius or warning level.");
         NumberFormatting.Validate(data.Format);
+        if (kind is SymbolKind.Tank or SymbolKind.Vessel && data.Maximum <= 0) throw new ArgumentException("Tank and vessel capacity must be positive.");
         data.Options?.Validate(kind.ToString()); data.Tank?.Validate();
     }
     public static void Draw(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolData data)

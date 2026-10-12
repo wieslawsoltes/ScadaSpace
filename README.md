@@ -21,7 +21,7 @@ The included water-treatment project has five views, eight typed simulated tags,
 | `ScadaSpace.Tags` | Thread-safe memory provider, typed/ranged writes, optimistic revision checks, ordered subscriptions |
 | `ScadaSpace.Expressions` | Bounded expression compiler/interpreter, dependency discovery and lazy evaluation |
 | `ScadaSpace.History` | Bounded per-tag rings, time queries, aggregates, quality-preserving decimation and CSV |
-| `ScadaSpace.Alarms` | Alarm states, hysteresis, on/off delays, acknowledgement, shelving and journal |
+| `ScadaSpace.Alarms` | Alarm states, hysteresis, delays, acknowledgement, shelving and journal |
 | `ScadaSpace.Runtime` | Per-instance bindings, parameters, transforms, navigation and declarative actions |
 | `ScadaSpace.Designer` | Validated document transactions, bounded undo/redo, selection and editing commands |
 | `ScadaSpace.Layout` | Coordinate, flex, responsive columns, breakpoint and tab layout calculations |
@@ -33,7 +33,7 @@ The core engines require no Uno UI. The graphics package can draw into a caller-
 
 ## Components
 
-The catalog contains 33 concrete component types: Label, LEDDisplay, Tank, Thermometer, Progress, Gauge, TrendChart, BarChart, PieChart, Button, ToggleSwitch, CheckBox, NumericEntry, TextField, Slider, Dropdown, RadioGroup, DateTimeInput, Table, Tree, TagBrowseTree, AlarmStatusTable, AlarmJournalTable, Rectangle, Ellipse, Line, Pipe, Pump, Valve, Motor, Container, EmbeddedView and FlexRepeater. These names describe ScadaSpace's own API, not binary-compatible Perspective classes.
+The catalog contains 35 concrete component types: Label, LEDDisplay, Tank, Thermometer, Progress, Gauge, TrendChart, BarChart, PieChart, Button, ToggleSwitch, CheckBox, NumericEntry, TextField, Slider, Dropdown, RadioGroup, DateTimeInput, Table, Tree, TagBrowseTree, AlarmStatusTable, AlarmJournalTable, Rectangle, Ellipse, Line, Pipe, Pump, Valve, Motor, Sensor, Vessel, Container, EmbeddedView and FlexRepeater. These names describe ScadaSpace's own API, not binary-compatible Perspective classes.
 
 ## Build and run
 
@@ -87,6 +87,10 @@ The workspace uses compact vector toolbar commands, bottom resource tabs, a full
 ## Event configuration and references
 
 **Component → Configure Events…** and the canvas context menu open a native event/action/settings editor. Add, reorder, duplicate, disable and validate existing local actions; Apply/OK/Cancel work with transactional undo/redo. **Configuration Explorer** searches bindings, transforms, events, actions and embedded-view references and selects their owning component. Generation-indexed search results and retained control maps avoid rebuilding unchanged inventories. See [configuration workflows, runtime hardening and boundaries](docs/configuration-workflows.md).
+
+## Industrial symbols
+
+Pump, Motor, Valve, Sensor and Vessel have independent Mimic, Simple and P&ID drawings with explicit states, orientation and annotations. Vessels and cylindrical tanks support clipped liquid fills and capacity-aware readouts. **Tools → Symbol Library…** previews the families and sets session-local automatic appearance/speed or reduced motion without writing process data. Native controls and palette thumbnails share retained vector pictures; unchanged symbols do not rebuild their drawing geometry. See [symbol options, rendering architecture, tests and limits](docs/industrial-symbols.md).
 
 ## Local Tag History bindings
 

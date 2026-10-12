@@ -57,9 +57,14 @@ public sealed record SymbolOptions
     public double Phase(double elapsedSeconds)
     {
         if (!double.IsFinite(elapsedSeconds)) throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
-        var period = AnimationSpeed > 0 ? 100 / AnimationSpeed : 1;
-        var phase = elapsedSeconds % period / period;
-        return !IsAnimated ? 0 : (phase + 1) % 1;
+        if (!double.IsFinite(AnimationSpeed) || AnimationSpeed is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(AnimationSpeed));
+        if (!IsAnimated) return 0;
+        var period = 100 / AnimationSpeed;
+        // A subnormal positive speed can have an infinite period. Divide time first
+        // rather than overflowing the period or underflowing speed / 100 to zero.
+        var phase = double.IsFinite(period) ? elapsedSeconds % period / period : elapsedSeconds / 100 * AnimationSpeed;
+        phase %= 1;
+        return phase < 0 ? (phase + 1) % 1 : phase;
     }
 }
 
@@ -94,10 +99,14 @@ public static class SymbolPresentation
         var readout = value.Kind == ScalarKind.Object ? Annotation(value) : new SymbolText();
         if (type == "Vessel" && value.Kind == ScalarKind.Object && value.Fields.ContainsKey("value"))
         {
-            var n = value.Fields["value"].AsNumber(); var capacity = value.Fields.GetValueOrDefault("capacity", Scalar.From(100)).AsNumber();
+            var numberValue = value.Fields["value"]; var capacityValue = value.Fields.GetValueOrDefault("capacity", Scalar.From(100));
+            var displayPercent = value.Fields.GetValueOrDefault("displayValueAsPercent", Scalar.From(true));
+            if (numberValue.Kind != ScalarKind.Number || capacityValue.Kind != ScalarKind.Number || displayPercent.Kind != ScalarKind.Boolean)
+                throw new ArgumentException("Vessel value/capacity require numbers and displayValueAsPercent requires a Boolean.");
+            var n = numberValue.Number; var capacity = capacityValue.Number;
             if (!double.IsFinite(capacity) || capacity <= 0) throw new ArgumentException("Vessel capacity must be positive.");
-            var percent = value.Fields.GetValueOrDefault("displayValueAsPercent", Scalar.From(true)).AsBoolean();
-            readout = readout with { Text = NumericInputText.FormatDouble(percent ? Math.Clamp(n / capacity * 100, 0, 100) : n) + (percent ? "%" : "") };
+            var percent = displayPercent.Boolean;
+            readout = readout with { Text = NumericInputText.FormatDouble(percent ? Fraction(n, 0, capacity) * 100 : n) + (percent ? "%" : "") };
         }
         var result = new SymbolOptions
         {
@@ -111,7 +120,7 @@ public static class SymbolPresentation
     public static SymbolText Annotation(Scalar value)
     {
         if (value.Kind == ScalarKind.Null) return new();
-        if (value.Kind == ScalarKind.String) return new(value.Text!);
+        if (value.Kind == ScalarKind.String) { var plain = new SymbolText(value.Text!); plain.Validate(); return plain; }
         if (value.Kind != ScalarKind.Object) throw new ArgumentException("A symbol annotation requires an object or text.");
         var f = value.Fields;
         string Text(string key, string fallback) => f.TryGetValue(key, out var v) ? v.Kind == ScalarKind.String ? v.Text! : throw new ArgumentException("Annotation " + key + " must be a string.") : fallback;

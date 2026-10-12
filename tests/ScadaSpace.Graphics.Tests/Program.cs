@@ -66,7 +66,14 @@ Check("cached symbol drawing has bounded idle managed allocations", () => {
     var bytes=GC.GetAllocatedBytesForCurrentThread();var start=Stopwatch.GetTimestamp();
     for(var i=0;i<1000;i++)cache.Draw(surface.Canvas,bounds,SymbolKind.Pump,data);
     var elapsed=Stopwatch.GetElapsedTime(start);var allocated=GC.GetAllocatedBytesForCurrentThread()-bytes;
-    File.WriteAllText("TestResults/symbols/performance.json",JsonSerializer.Serialize(new{iterations=1000,bytesPerDraw=allocated/1000d,microsecondsPerDraw=elapsed.TotalMicroseconds/1000,pictures=cache.PictureBuildCount,note="Raster Skia playback; not whole-app or physical-GPU speed."}));
+    for(var i=0;i<30;i++)SymbolRenderer.Draw(surface.Canvas,bounds,SymbolKind.Pump,data);
+    var referenceBytes=GC.GetAllocatedBytesForCurrentThread();var referenceStart=Stopwatch.GetTimestamp();
+    for(var i=0;i<1000;i++)SymbolRenderer.Draw(surface.Canvas,bounds,SymbolKind.Pump,data);
+    var referenceElapsed=Stopwatch.GetElapsedTime(referenceStart);var referenceAllocated=GC.GetAllocatedBytesForCurrentThread()-referenceBytes;
+    File.WriteAllText("TestResults/symbols/performance.json",JsonSerializer.Serialize(new{iterations=1000,bytesPerDraw=allocated/1000d,microsecondsPerDraw=elapsed.TotalMicroseconds/1000,
+        referenceBytesPerDraw=referenceAllocated/1000d,referenceMicrosecondsPerDraw=referenceElapsed.TotalMicroseconds/1000,pictures=cache.PictureBuildCount,
+        note="Same-data raster Skia playback versus immediate drawing after warmup; not whole-app or physical-GPU speed."}));
+    Assert(allocated<referenceAllocated/4,"Cached drawing must allocate less than the equivalent immediate drawing.");
     Assert(allocated<128000 && cache.PictureBuildCount==1,"Idle rendering allocated or rebuilt geometry.");
 });
 Check("animation changes pixels without rebuilding the static picture", () => {
@@ -94,6 +101,13 @@ Check("tank capacity percent opacity and strict warning boundary are rendered", 
     Assert(Image(SymbolKind.Tank,normal)!=Image(SymbolKind.Tank,normal with {Value=51}));
     Assert(Image(SymbolKind.Tank,normal)!=Image(SymbolKind.Tank,normal with {Tank=normal.Tank! with {LiquidOpacity=0}}));
     Assert(Image(SymbolKind.Tank,normal)!=Image(SymbolKind.Tank,normal with {Tank=normal.Tank! with {ShowValue=false}}));
+});
+Check("quality overlays handle tiny and distant finite bounds without leaking canvas state", () => {
+    using var surface=SKSurface.Create(new SKImageInfo(32,32));var c=surface.Canvas;var saved=c.SaveCount;
+    foreach(var bounds in new[]{SKRect.Create(1,1),SKRect.Create(1e10f,1e10f,4096,4096),SKRect.Empty})
+    { SymbolRenderer.DrawQuality(c,bounds,Quality.Stale);Assert(c.SaveCount==saved); }
+    Throws(()=>SymbolRenderer.DrawQuality(c,new SKRect(float.NaN,0,10,10),Quality.Stale));
+    Throws(()=>SymbolRenderer.Draw(c,SKRect.Create(100,100),SymbolKind.Tank,new(Minimum:-10,Maximum:0)));
 });
 Check("render all industrial appearance and state contact sheets", () => {
     var kinds=new[]{SymbolKind.Pump,SymbolKind.Pump,SymbolKind.Motor,SymbolKind.Valve,SymbolKind.Sensor,SymbolKind.Vessel};

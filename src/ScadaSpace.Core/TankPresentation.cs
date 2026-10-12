@@ -21,16 +21,26 @@ public sealed record TankOptions(string TankColor = "#D6D6D6", string TankWarnin
         if (display.Kind != ScalarKind.Null)
         {
             if (display.Kind != ScalarKind.Object) throw new ArgumentException("valueDisplay must be an object.");
-            var f = display.Fields; show = f.GetValueOrDefault("enabled", Scalar.From(true)).AsBoolean();
-            format = f.GetValueOrDefault("format", Scalar.From("None")).ToString();
+            var f = display.Fields;
+            static bool Flag(IReadOnlyDictionary<string, Scalar> fields, string key, bool fallback)
+            {
+                var v = fields.GetValueOrDefault(key, Scalar.From(fallback));
+                return v.Kind == ScalarKind.Boolean ? v.Boolean : throw new ArgumentException("Tank " + key + " must be Boolean.");
+            }
+            static string Label(IReadOnlyDictionary<string, Scalar> fields, string key, string fallback)
+            {
+                var v = fields.GetValueOrDefault(key, Scalar.From(fallback));
+                return v.Kind == ScalarKind.String ? v.Text! : throw new ArgumentException("Tank " + key + " must be text.");
+            }
+            show = Flag(f, "enabled", true); format = Label(f, "format", "None");
             if (f.TryGetValue("style", out var style) && style.Kind != ScalarKind.Null && (style.Kind != ScalarKind.Object || style.Fields.Count > 0)) throw new ArgumentException("Tank valueDisplay CSS styling is not supported.");
             if (f.TryGetValue("unit", out var u))
             {
                 if (u.Kind != ScalarKind.Object) throw new ArgumentException("valueDisplay.unit must be an object.");
-                if (u.Fields.GetValueOrDefault("enabled", Scalar.From(false)).AsBoolean())
+                if (Flag(u.Fields, "enabled", false))
                 {
-                    unit = u.Fields.GetValueOrDefault("value", Scalar.From("")).ToString();
-                    var fix = u.Fields.GetValueOrDefault("fix", Scalar.From("postfix")).ToString();
+                    unit = Label(u.Fields, "value", "");
+                    var fix = Label(u.Fields, "fix", "postfix");
                     if (fix is not ("prefix" or "postfix")) throw new ArgumentException("Tank unit fix must be prefix or postfix."); prefix = fix == "prefix";
                 }
             }

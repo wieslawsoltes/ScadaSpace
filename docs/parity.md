@@ -12,9 +12,10 @@ This document describes implemented behavior, not a declaration of full parity. 
 | Bidirectional input | Enabled untransformed tag/property bindings, nested writeback, alias traversal, instance-local input, source read-only/type/range/revision checks | No automatic transform inversion or remote transactional tag writes |
 | Containers | Coordinate, weighted row/column flex, responsive columns, breakpoint and active-tab calculations | Not full CSS/flex semantics; tab selection is configured through properties, not a complete native tab-container editor |
 | Reuse | Reactive embedded paths/parameters and repeater counts/instance arrays, preserved child-local state, incremental disposal, recursion limits | Index-keyed, at most 100 instances; not complete Perspective repeater/CSS/parameter-direction semantics |
-| Display and input | Concrete catalog of 33 component types with shared Uno runtime/designer host | Not the complete Perspective component catalog; image/media/map/file-upload, mobile/device components and specialized charts remain |
+| Display and input | Concrete catalog of 35 component types with shared Uno runtime/designer host | Not the complete Perspective component catalog; image/media/map/file-upload, mobile/device components and specialized charts remain |
 | Tables | Typed array-of-object data, source-row identity, numeric UI sorting/filtering, revision-checked cell editing and selection; reusable multi-key queries/paging/CSV | No complete grouped grid, multi-sort/pagination UI, custom cell renderer catalog, keyboard/accessibility peers or full Perspective table event payloads |
 | Hierarchical trees | Virtualized native Tree, immutable hierarchy adapter, local tag-provider browser, expansion/filtering, keyboard/multi-selection, typed selection data and automation peers | Not complete Perspective appearance/icon/overflow APIs, drag/reparent editing, lazy remote loading or remote Tag Browse Tree protocols |
+| Industrial symbols | Mimic/Simple/P&ID Pump, Motor, Valve, Sensor and Vessel; variants, directions, state/quality display, annotations, capacity/fill controls, native gallery and local auto defaults; cached static pictures and small motion overlays | Independently drawn, not pixel-identical; no project-custom state/theme palettes, full CSS/annotation styling, exact original artwork or complete component catalog |
 | Charts | Live qualified history, time-window zoom, crosshair, time-series/bar/pie, extrema decimation | No complete Power Chart, pen management, range brush or chart annotation parity |
 | Alarms | States, hysteresis, delays, acknowledgement, timed shelving, status/journal tables | No alarm pipelines, email/SMS/voice notifications, remote journal database or full Perspective alarm filtering/actions |
 | History | Bounded memory storage, atomic UTC snapshots, streaming sample aggregates, cached tall document queries, quality-aware trace, CSV export | No SQL historian, store-and-forward, compression tiers, time-weighted interpolation or durable recovery |
@@ -27,7 +28,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 ## Verification scope
 
-Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Eight browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration and hierarchy editing. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
+Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Ten browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration, hierarchy editing, style authoring and industrial symbols. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
 
 Counts and pass/fail claims apply only to the exact revision in the corresponding Actions artifacts. Build success alone is not runtime evidence. See [validation](validation.md), [configuration workflows](configuration-workflows.md), and the retained source, reports and screenshots for executed scope.
 
@@ -47,3 +48,5 @@ See [local history bindings and review](history-bindings.md) for the added query
 See [designer workspace and UI review](designer-workspace.md) for the independently implemented layout, tab/pane behavior, control reuse, keyboard fixes and remaining visual boundaries.
 
 See [designer hierarchy editing and performance review](hierarchy-editing.md) for wrapping, evaluated source navigation, rollback recovery and indexed layout/lookup APIs.
+
+See [industrial symbols](industrial-symbols.md) for the independent family drawings, native control integration, quality/animation behavior and explicit remaining graphics boundaries.

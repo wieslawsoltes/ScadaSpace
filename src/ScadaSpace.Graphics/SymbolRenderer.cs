@@ -107,10 +107,25 @@ public static partial class SymbolRenderer
     private static int TextWidth(string text) { var width = 0; foreach (var ch in text) width += ch == '.' ? 12 : 30; return width; }
     public static void DrawQuality(SKCanvas canvas, SKRect bounds, Quality quality)
     {
-        canvas.Save(); canvas.ClipRect(bounds); using var p = new CanvasPainter(canvas);
-        p.Rect(bounds, SKColors.White.WithAlpha(110));
-        for (var x = bounds.Left - bounds.Height; x < bounds.Right; x += 18) p.Line(x, bounds.Bottom, x + bounds.Height, bounds.Top, SKColors.OrangeRed.WithAlpha(35), 4);
-        p.Rect(SKRect.Create(bounds.Left + 2, bounds.Top + 2, Math.Min(150, bounds.Width - 4), 22), SKColor.Parse("#A64E35"), 2);
-        p.Text(quality.ToString(), bounds.Left + 6, bounds.Top + 17, 11, SKColors.White); canvas.Restore();
+        ArgumentNullException.ThrowIfNull(canvas);
+        if (!float.IsFinite(bounds.Left) || !float.IsFinite(bounds.Top) || !float.IsFinite(bounds.Right) || !float.IsFinite(bounds.Bottom)
+            || bounds.Width > 32768 || bounds.Height > 32768 || !Enum.IsDefined(quality)) throw new ArgumentException("Invalid quality overlay bounds or quality.");
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        var saved = canvas.Save();
+        try
+        {
+            canvas.ClipRect(bounds); using var p = new CanvasPainter(canvas);
+            p.Rect(bounds, SKColors.White.WithAlpha(110));
+            var stripes = (int)Math.Ceiling(((double)bounds.Width + bounds.Height) / 18);
+            for (var i = 0; i < stripes; i++)
+            {
+                var x = bounds.Left - bounds.Height + i * 18d;
+                p.Line((float)x, bounds.Bottom, (float)(x + bounds.Height), bounds.Top, SKColors.OrangeRed.WithAlpha(35), 4);
+            }
+            if (bounds.Width < 8 || bounds.Height < 8) return;
+            p.Rect(SKRect.Create(bounds.Left + 2, bounds.Top + 2, Math.Min(150, bounds.Width - 4), Math.Min(22, bounds.Height - 4)), SKColor.Parse("#A64E35"), 2);
+            p.Text(quality.ToString(), bounds.Left + 6, bounds.Top + 17, 11, SKColors.White);
+        }
+        finally { canvas.RestoreToCount(saved); }
     }
 }
