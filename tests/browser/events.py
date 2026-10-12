@@ -49,7 +49,9 @@ with sync_playwright() as p:
     def fill_event(name, text):
         event_field(name);page.keyboard.press('Control+a');page.keyboard.press('Backspace');page.keyboard.insert_text(text)
     def open_events():
-        command('menu-Component');command('configure-events');wait('window.scadaApp.eventEditor !== null')
+        command('menu-Component');command('configure-events')
+        # A dialog instance exists before its native event rows finish layout.
+        wait("window.scadaApp.eventEditor?.fields['event-onClick']?.width > 0")
     def explorer_field(name):
         page.wait_for_function('key=>window.scadaApp.configurationExplorer?.fields[key]?.width>0',arg=name,timeout=30000)
         click(app()['configurationExplorer']['fields'][name])

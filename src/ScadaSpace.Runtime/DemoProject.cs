@@ -41,6 +41,10 @@ public static class DemoProject
         var tank2 = Make("Tank", "Tank02", 536, 176, 194, 230); Bind(tank2, "value", "Tank02/Level"); tank2.Props["color"] = Scalar.From("#6499CB");
         var pump = Make("Pump", "TransferPump", 362, 326, 102, 96); Bind(pump, "value", "Pump/Enabled");
         var valve = Make("Valve", "OutletValve", 820, 280, 105, 90); Bind(valve, "value", "Pump/Enabled");
+        // Catalog symbols start in their explicit neutral state. The process example
+        // must bind that state as well as retain its historical Boolean value contract.
+        pump.Bindings["state"] = new() { Kind = BindingKind.Expression, Source = "if({[default]Plant/Pump/Enabled}, 'running', 'stopped')" };
+        valve.Bindings["state"] = new() { Kind = BindingKind.Expression, Source = "if({[default]Plant/Pump/Enabled}, 'open', 'closed')" };
         Label("PumpLabel", "P-101", 376, 423, 100, 13);
         Label("ValveLabel", "XV-102", 841, 378, 120, 13);
         var gauge = Make("Gauge", "FlowGauge", 301, 155, 228, 155); Bind(gauge, "value", "Pump/Flow"); gauge.Props["maximum"] = Scalar.From(200); gauge.Props["unit"] = Scalar.From("m³/h");
@@ -71,6 +75,7 @@ public static class DemoProject
         var detailGauge = ComponentCatalog.Create("Gauge", 25, 50); detailGauge.Width = 240; detailGauge.Height = 160; detailGauge.Bindings["value"] = new() { Kind = BindingKind.Tag, Source = "[default]Plant/{equipment}/Level" }; detail.Root.Children.Add(detailGauge); project.Views.Add(detail);
         var gallery = View("ComponentGallery", 1040, 1500);
         var items = ComponentCatalog.All.Where(x => x.Type is not ("Container" or "FlexRepeater" or "EmbeddedView" or "AlarmStatusTable" or "AlarmJournalTable" or "TrendChart" or "Table")).ToArray();
+        gallery.Height = gallery.Root.Height = 18 + Math.Ceiling(items.Length / 4d) * 220;
         for (var i = 0; i < items.Length; i++)
         {
             var x = 26 + i % 4 * 255; var y = 18 + i / 4 * 220;

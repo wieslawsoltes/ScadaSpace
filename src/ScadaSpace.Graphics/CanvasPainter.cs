@@ -7,8 +7,10 @@ public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
 {
     /// <summary>Optional application-owned typeface. Set before drawing and retain it until rendering has stopped.</summary>
     public static SKTypeface? DrawingTypeface { get; set; }
-    public SKCanvas Canvas { get; } = canvas;
+    public SKCanvas Canvas { get; private set; } = canvas;
+    public void Bind(SKCanvas canvas) { ArgumentNullException.ThrowIfNull(canvas); Canvas = canvas; }
     private readonly SKPaint _paint = new() { IsAntialias = true, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
+    private readonly SKPath _curve = new();
     private readonly SKFont _font = new(DrawingTypeface ?? SKTypeface.Default, 13);
     public static SKColor Color(string value, string fallback = "#415969") => SKColor.TryParse(value, out var color) ? color : SKColor.Parse(fallback);
     private SKPaint Paint(SKColor color, bool stroke = false, float width = 1)
@@ -28,7 +30,11 @@ public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
     public void Polygon(SKColor color, params SKPoint[] points)
     {
         if (points.Length == 0) return;
-        using var path = new SKPath(); path.MoveTo(points[0]); foreach (var point in points.Skip(1)) path.LineTo(point); path.Close(); Path(path, color);
+        using var path = new SKPath(); path.MoveTo(points[0]); for (var i = 1; i < points.Length; i++) path.LineTo(points[i]); path.Close(); Path(path, color);
+    }
+    public void Curve(float x, float y, float c1x, float c1y, float c2x, float c2y, float endX, float endY, SKColor color, float width = 1)
+    {
+        _curve.Rewind(); _curve.MoveTo(x, y); _curve.CubicTo(c1x, c1y, c2x, c2y, endX, endY); Path(_curve, color, true, width);
     }
     public void Arc(SKRect rect, float startAngle, float sweep, SKColor color, float width)
     { using var path = new SKPath(); path.AddArc(rect, startAngle, sweep); Path(path, color, true, width); }
@@ -37,5 +43,5 @@ public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
         using var shader = SKShader.CreateLinearGradient(new(rect.Left, 0), new(rect.Right, 0), [left, center, right], [0f, .45f, 1f], SKShaderTileMode.Clamp);
         var paint = Paint(left); paint.Shader = shader; Canvas.DrawRect(rect, paint); paint.Shader = null;
     }
-    public void Dispose() { _font.Dispose(); _paint.Dispose(); }
+    public void Dispose() { _curve.Dispose(); _font.Dispose(); _paint.Dispose(); }
 }

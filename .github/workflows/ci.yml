@@ -30,6 +30,7 @@ jobs:
           dotnet run --project tests/ScadaSpace.Hardening.Tests -c Release
           dotnet run --project tests/ScadaSpace.Parity.Tests -c Release
           dotnet run --project tests/ScadaSpace.Performance -c Release
+          dotnet run --project tests/ScadaSpace.Graphics.Tests -c Release
           node --test --test-reporter=tap tests/browser/navigation-adapter.test.cjs > TestResults/navigation-adapter.tap
       - name: Pack reusable engine libraries
         run: |
@@ -88,6 +89,7 @@ jobs:
           python tests/browser/events.py
           python tests/browser/hierarchy.py
           python tests/browser/styles.py
+          python tests/browser/symbols.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -102,6 +104,7 @@ jobs:
             TestResults/browser-events
             TestResults/browser-hierarchy
             TestResults/browser-styles
+            TestResults/browser-symbols
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()

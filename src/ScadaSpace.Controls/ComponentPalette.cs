@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ScadaSpace.Core;
+using ScadaSpace.Graphics;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace ScadaSpace.Controls;
@@ -51,7 +52,7 @@ public partial class ComponentPalette : Grid
             header.Click+=(_,_)=>{group.Expanded=!group.Expanded;Filter();};Commands["category-"+group.Name]=header;
             foreach(var descriptor in descriptors)
             {
-                var content=new StackPanel {Orientation=Orientation.Horizontal,Spacing=7};content.Children.Add(new DesignerIcon(descriptor.Category,15));content.Children.Add(ControlTheme.Text(descriptor.DisplayName,11));
+                var content=new StackPanel {Orientation=Orientation.Horizontal,Spacing=7};content.Children.Add(SymbolThumbnail(descriptor));content.Children.Add(ControlTheme.Text(descriptor.DisplayName,11));
                 var button=ControlTheme.Button(descriptor.DisplayName,()=>ComponentRequested?.Invoke(descriptor.Type),"palette-"+descriptor.Type);
                 button.Content=content;button.BorderThickness=new Thickness(0);button.CornerRadius=new CornerRadius(0);button.Background=ControlTheme.Brush("#FFFFFF");button.HorizontalAlignment=HorizontalAlignment.Stretch;button.CanDrag=true;
                 button.DragStarting+=(_,e)=>{e.Data.SetText("scadaspace:"+descriptor.Type);e.Data.RequestedOperation=DataPackageOperation.Copy;};
@@ -60,6 +61,14 @@ public partial class ComponentPalette : Grid
             }
         }
         _search.TextChanged+=(_,_)=>Filter();Filter();
+    }
+    private static FrameworkElement SymbolThumbnail(ComponentDescriptor descriptor)
+    {
+        if (!Enum.TryParse<SymbolKind>(descriptor.Type, out var kind)) return new DesignerIcon(descriptor.Category, 18);
+        var symbol = new HmiSymbol { Kind = kind, Width = 18, Height = 18, AllowAnimation = false, IsHitTestVisible = false };
+        symbol.SetSnapshot(new(Value: 45, Options: IndustrialSymbolRenderer.Supports(kind) ? new() { Appearance = "simple", Orientation = kind == SymbolKind.Vessel ? "vertical" : "right" } : null,
+            Tank: kind == SymbolKind.Tank ? new(ShowValue: false, ShowScale: false) : null));
+        return symbol;
     }
     public void ExpandAll(bool expanded) {foreach(var group in _groups)group.Expanded=expanded;Filter();}
     private void Filter()
@@ -78,11 +87,11 @@ public partial class ComponentPalette : Grid
             {
                 var visible=expanded&&matching.Contains(item);item.Button.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
                 if(!visible)continue;
-                if(index%columns==0)group.Items.RowDefinitions.Add(new() {Height=new GridLength(_tiles?65:26)});
+                if(index%columns==0)group.Items.RowDefinitions.Add(new() {Height=new GridLength(_tiles?76:26)});
                 Grid.SetColumn(item.Button,index%columns);Grid.SetRow(item.Button,index/columns);
                 item.Button.Padding=new Thickness(_tiles?2:10,2,_tiles?2:4,2);item.Button.HorizontalContentAlignment=_tiles?HorizontalAlignment.Center:HorizontalAlignment.Left;
                 item.Content.Orientation=_tiles?Orientation.Vertical:Orientation.Horizontal;item.Content.Spacing=_tiles?4:7;
-                ((DesignerIcon)item.Content.Children[0]).Width=((DesignerIcon)item.Content.Children[0]).Height=_tiles?24:15;
+                ((FrameworkElement)item.Content.Children[0]).Width=((FrameworkElement)item.Content.Children[0]).Height=_tiles?32:18;
                 var label=(TextBlock)item.Content.Children[1];label.TextWrapping=_tiles?TextWrapping.Wrap:TextWrapping.NoWrap;
                 label.MaxWidth=_tiles?64:double.PositiveInfinity;label.MaxLines=_tiles?2:1;label.TextAlignment=_tiles?TextAlignment.Center:TextAlignment.Left;
                 index++;VisibleComponentCount++;

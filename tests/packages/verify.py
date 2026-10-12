@@ -75,6 +75,12 @@ Check(style.Values["foreground"].Text == "#224466" && ReferenceEquals(style, sty
 Check(style.Origins["foreground"].ClassName == "PackageStyle" && !style.Origins["foreground"].IsInline, "packaged style resolver reports the winning declaration origin");
 Check(StyleColor.Parse("#80446688").Alpha == 128 && StyleColor.Parse("#80446688").Blue == 136, "packaged color helpers retain explicit ARGB channel order");
 
+var symbolProps = Scalar.FromJson("""{"appearance":"auto","state":"running","label":{"text":"P-101","location":"top"}}""").Fields;
+var presentation = SymbolPresentation.Read("Pump", key => symbolProps.GetValueOrDefault(key), new("simple",25));
+Check(presentation.Appearance == "simple" && presentation.AnimationSpeed == 25 && presentation.Label.Text == "P-101", "packaged symbol presentation resolves typed defaults and labels without Uno");
+var symbolSession = new RuntimeSession(runtime) { Symbols = new("p&id",0,true) };
+Check(symbolSession.Symbols.ReducedMotion && SymbolPresentation.Fraction(0,-double.MaxValue,double.MaxValue) == .5, "packaged session symbols and finite range math remain independently reusable");
+
 '''
 logs = []
 try:
@@ -93,8 +99,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 16:
-            raise RuntimeError(f"Expected sixteen executed package checks; got {count}")
+        if count != 18:
+            raise RuntimeError(f"Expected eighteen executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):
