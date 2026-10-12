@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace ScadaSpace.Core;
 
-/// <summary>Immutable theme colors and independently enabled effects. Hex colors use explicit ARGB ordering.</summary>
 public sealed record SymbolStateStyle(string PrimaryColor = "#F4F4F4", string SecondaryColor = "#D9E7DE",
     string TertiaryColor = "#00ACAC", string StrokeColor = "#606060", bool EnableAnimation = false, bool EnableFlashing = false)
 {
@@ -15,7 +14,7 @@ public sealed record SymbolStateStyle(string PrimaryColor = "#F4F4F4", string Se
     }
 }
 
-/// <summary>Owned, bounded family assignments and original theme values for Reset Theme.</summary>
+/// <summary>Owned family assignments and original theme values for Reset Theme.</summary>
 public sealed class SymbolStateDefinition
 {
     public SymbolStateStyle Light { get; }
@@ -29,12 +28,14 @@ public sealed class SymbolStateDefinition
     {
         ArgumentNullException.ThrowIfNull(light); ArgumentNullException.ThrowIfNull(dark); ArgumentNullException.ThrowIfNull(symbols);
         light.Validate(); dark.Validate(); (initialLight ?? light).Validate(); (initialDark ?? dark).Validate();
-        if (symbols.Count > SymbolStateCatalog.Families.Count || symbols.Any(s => !SymbolStateCatalog.Families.Contains(s, StringComparer.Ordinal))
+        if (symbols.Count > SymbolStateCatalog.Families.Count || symbols.Any(s => !SymbolStateCatalog.IsFamily(s))
             || symbols.Distinct(StringComparer.Ordinal).Count() != symbols.Count)
             throw new ArgumentException("Apply each supported symbol family at most once.");
         Light = light; Dark = dark; InitialLight = initialLight ?? light; InitialDark = initialDark ?? dark;
         Symbols = Array.AsReadOnly(symbols.Order(StringComparer.Ordinal).ToArray());
     }
+    public bool AppliesTo(string family)
+    { for (var i = 0; i < Symbols.Count; i++) if (Symbols[i] == family) return true; return false; }
     public SymbolStateDefinition WithTheme(string theme, SymbolStateStyle value)
     {
         SymbolStateCatalog.ValidateTheme(theme); ArgumentNullException.ThrowIfNull(value);
@@ -46,7 +47,7 @@ public sealed class SymbolStateDefinition
         && InitialLight == other.InitialLight && InitialDark == other.InitialDark && Symbols.SequenceEqual(other.Symbols);
 }
 
-/// <summary>Immutable project catalog. Stored states are overrides; built-in names are always available for editing.</summary>
+/// <summary>Immutable project catalog; stored entries override immutable built-ins.</summary>
 public sealed class SymbolStateCatalog
 {
     public const int MaximumOverrides = 128;
@@ -62,10 +63,16 @@ public sealed class SymbolStateCatalog
         if (states.Count > MaximumOverrides) throw new ArgumentException("At most 128 symbol state overrides are allowed.");
         var owned = new Dictionary<string, SymbolStateDefinition>(StringComparer.Ordinal);
         foreach (var (name, state) in states)
-        { ValidateName(name); ArgumentNullException.ThrowIfNull(state); owned.Add(name, state); }
+        {
+            ValidateName(name); ArgumentNullException.ThrowIfNull(state);
+            // Built-in reset baselines are defined by the product, not caller-supplied overrides.
+            owned.Add(name, BuiltIns.TryGetValue(name, out var builtin)
+                ? new(state.Light, state.Dark, state.Symbols, builtin.InitialLight, builtin.InitialDark) : state);
+        }
         States = new ReadOnlyDictionary<string, SymbolStateDefinition>(owned);
         Names = Array.AsReadOnly(BuiltIns.Keys.Concat(owned.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
     }
+    public static bool IsFamily(string family) => family is "Pump" or "Motor" or "Valve" or "Sensor" or "Vessel";
     public static void ValidateName(string name)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Length > 64 || name != name.Trim() || name.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '-' or '_')))
@@ -79,17 +86,16 @@ public sealed class SymbolStateCatalog
     public SymbolStateStyle Resolve(string family, string name, string theme)
     {
         ValidateTheme(theme);
-        if (!Families.Contains(family, StringComparer.Ordinal)) throw new ArgumentException("Unknown symbol family: " + family);
+        if (!IsFamily(family)) throw new ArgumentException("Unknown symbol family: " + family);
         var state = Get(name);
-        if (!state.Symbols.Contains(family, StringComparer.Ordinal)) throw new ArgumentException("State " + name + " is not applied to " + family + ".");
+        if (!state.AppliesTo(family)) throw new ArgumentException("State " + name + " is not applied to " + family + ".");
         return theme == "light" ? state.Light : state.Dark;
     }
     public SymbolStateCatalog With(string name, SymbolStateDefinition value)
     {
         ValidateName(name); ArgumentNullException.ThrowIfNull(value);
         if (States.TryGetValue(name, out var old) && old.Equivalent(value)) return this;
-        var next = new Dictionary<string, SymbolStateDefinition>(States, StringComparer.Ordinal) { [name] = value };
-        return new(next);
+        var next = new Dictionary<string, SymbolStateDefinition>(States, StringComparer.Ordinal) { [name] = value }; return new(next);
     }
     public SymbolStateCatalog WithoutCustom(string name)
     {
@@ -101,8 +107,7 @@ public sealed class SymbolStateCatalog
     {
         if (ReferenceEquals(this, other)) return true;
         if (other is null || States.Count != other.States.Count) return false;
-        foreach (var (name, state) in States)
-            if (!other.States.TryGetValue(name, out var value) || !state.Equivalent(value)) return false;
+        foreach (var (name, state) in States) if (!other.States.TryGetValue(name, out var value) || !state.Equivalent(value)) return false;
         return true;
     }
     private static IReadOnlyDictionary<string, SymbolStateDefinition> CreateBuiltIns()
@@ -124,10 +129,6 @@ public sealed class SymbolStateCatalog
 public sealed partial class ProjectDefinition
 {
     private SymbolStateCatalog _symbolStates = SymbolStateCatalog.Empty;
-    /// <summary>Validated immutable state configuration; absent in older projects means built-in defaults.</summary>
-    public SymbolStateCatalog SymbolStates
-    {
-        get => _symbolStates;
-        set { ArgumentNullException.ThrowIfNull(value); _symbolStates = value; }
-    }
+    /// <summary>Absent in older projects means built-in defaults; null is rejected before publication.</summary>
+    public SymbolStateCatalog SymbolStates { get => _symbolStates; set { ArgumentNullException.ThrowIfNull(value); _symbolStates = value; } }
 }

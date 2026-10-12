@@ -1,12 +1,13 @@
 namespace ScadaSpace.Core;
 
-/// <summary>Session-local defaults for symbols using auto. Does not mutate project defaults.</summary>
-public sealed record SymbolDefaults(string AutoAppearance = "mimic", double AutoAnimationSpeed = 50, bool ReducedMotion = false)
+/// <summary>Session-local automatic presentation and symbol-only light/dark theme.</summary>
+public sealed record SymbolDefaults(string AutoAppearance = "mimic", double AutoAnimationSpeed = 50, bool ReducedMotion = false, string Theme = "light")
 {
     public void Validate()
     {
         if (AutoAppearance is not ("mimic" or "simple" or "p&id") || !double.IsFinite(AutoAnimationSpeed) || AutoAnimationSpeed is < 0 or > 100)
             throw new ArgumentException("Symbol defaults require mimic, simple or p&id and animation speed 0–100.");
+        SymbolStateCatalog.ValidateTheme(Theme);
     }
 }
 
@@ -20,7 +21,7 @@ public sealed record SymbolText(string Text = "", string Location = "bottom", st
     }
 }
 
-/// <summary>UI-independent, immutable industrial symbol drawing options. The vocabulary is explicit, not arbitrary SVG/CSS.</summary>
+/// <summary>UI-independent, immutable industrial drawing options, including an optional resolved state theme.</summary>
 public sealed record SymbolOptions
 {
     public string Appearance { get; init; } = "mimic";
@@ -28,7 +29,7 @@ public sealed record SymbolOptions
     public string Orientation { get; init; } = "right";
     public string Variant { get; init; } = "centrifugal";
     public string Feet { get; init; } = "bottom";
-    public double AnimationSpeed { get; init; } = 0;
+    public double AnimationSpeed { get; init; }
     public bool ReverseFlow { get; init; }
     public bool DisplayStand { get; init; } = true;
     public bool DisplayAgitator { get; init; } = true;
@@ -38,9 +39,12 @@ public sealed record SymbolOptions
     public string LiquidWarningColor { get; init; } = "#D88837";
     public SymbolText Label { get; init; } = new();
     public SymbolText Readout { get; init; } = new();
+    public SymbolStateStyle? StateStyle { get; init; }
     public bool IsFaulted => State is "faulted" or "failedToOpen" or "failedToClose";
     public bool IsRunning => State is "running" or "open";
-    public bool IsAnimated => IsRunning && AnimationSpeed > 0;
+    public bool IsAnimated => AnimationSpeed > 0 && (StateStyle?.EnableAnimation ?? IsRunning);
+    public bool IsFlashing => AnimationSpeed > 0 && StateStyle?.EnableFlashing == true;
+    public bool NeedsAnimation => IsAnimated || IsFlashing;
     public void Validate(string type)
     {
         if (Appearance is not ("mimic" or "simple" or "p&id") || Variant is not ("centrifugal" or "vacuum")
@@ -49,31 +53,34 @@ public sealed record SymbolOptions
             throw new ArgumentException("Invalid symbol appearance, variant, feet, speed or liquid settings.");
         if (type == "Vessel" ? Orientation is not ("vertical" or "horizontal") : Orientation is not ("top" or "bottom" or "left" or "right"))
             throw new ArgumentException("Invalid " + type + " orientation.");
-        if (type == "Valve" ? State is not ("default" or "open" or "closed" or "partiallyClosed" or "failedToOpen" or "failedToClose")
+        if (StateStyle is not null)
+        {
+            SymbolStateCatalog.ValidateName(State); StateStyle.Validate();
+            if (!SymbolStateCatalog.Families.Contains(type)) throw new ArgumentException("State themes apply only to industrial symbols.");
+        }
+        else if (type == "Valve" ? State is not ("default" or "open" or "closed" or "partiallyClosed" or "failedToOpen" or "failedToClose")
             : State is not ("default" or "running" or "stopped" or "faulted")) throw new ArgumentException("Unsupported " + type + " state: " + State);
         ArgumentNullException.ThrowIfNull(Label); ArgumentNullException.ThrowIfNull(Readout); Label.Validate(); Readout.Validate();
     }
-    /// <summary>Bounded phase in turns; no animation state or writes are stored in the model.</summary>
+    /// <summary>Bounded effect phase; maximum 100 percent gives one flash cycle per second.</summary>
     public double Phase(double elapsedSeconds)
     {
         if (!double.IsFinite(elapsedSeconds)) throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
         if (!double.IsFinite(AnimationSpeed) || AnimationSpeed is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(AnimationSpeed));
-        if (!IsAnimated) return 0;
+        if (!NeedsAnimation) return 0;
         var period = 100 / AnimationSpeed;
-        // A subnormal positive speed can have an infinite period. Divide time first
-        // rather than overflowing the period or underflowing speed / 100 to zero.
         var phase = double.IsFinite(period) ? elapsedSeconds % period / period : elapsedSeconds / 100 * AnimationSpeed;
-        phase %= 1;
-        return phase < 0 ? (phase + 1) % 1 : phase;
+        phase %= 1; return phase < 0 ? (phase + 1) % 1 : phase;
     }
+    public bool AlternateFill(double elapsedSeconds) => IsFlashing && Phase(elapsedSeconds) >= .5;
 }
 
-/// <summary>Reads typed component properties and nested annotation objects using the host's qualified resolver.</summary>
 public static class SymbolPresentation
 {
-    public static SymbolOptions Read(string type, Func<string, Scalar> read, SymbolDefaults defaults, double legacyValue = 0)
+    public static SymbolOptions Read(string type, Func<string, Scalar> read, SymbolDefaults defaults, double legacyValue = 0, SymbolStateCatalog? states = null)
     {
         ArgumentNullException.ThrowIfNull(read); ArgumentNullException.ThrowIfNull(defaults); defaults.Validate();
+        if (!SymbolStateCatalog.Families.Contains(type) || !double.IsFinite(legacyValue)) throw new ArgumentException("Invalid symbol family or legacy value.");
         string Text(string key, string fallback)
         {
             var value = read(key); if (value.Kind == ScalarKind.Null) return fallback;
@@ -95,8 +102,10 @@ public static class SymbolPresentation
             : speed.Kind == ScalarKind.Number ? speed.Number : throw new ArgumentException("animationSpeed requires auto or a percentage.");
         if (!double.IsFinite(animation) || animation is < 0 or > 100) throw new ArgumentException("animationSpeed must be within 0–100.");
         var state = Text("state", type == "Valve" ? legacyValue != 0 ? "open" : "closed" : legacyValue != 0 ? "running" : "stopped");
-        var label = Annotation(read("label")); var value = read("value");
-        var readout = value.Kind == ScalarKind.Object ? Annotation(value) : new SymbolText();
+        var stateStyle = states is not null || defaults.Theme == "dark" ? (states ?? SymbolStateCatalog.Empty).Resolve(type, state, defaults.Theme) : null;
+        var textColor = defaults.Theme == "dark" ? "#E5E9EC" : "#333333";
+        var label = Annotation(read("label"), textColor); var value = read("value");
+        var readout = value.Kind == ScalarKind.Object ? Annotation(value, textColor) : new SymbolText(Color: textColor);
         if (type == "Vessel" && value.Kind == ScalarKind.Object && value.Fields.ContainsKey("value"))
         {
             var numberValue = value.Fields["value"]; var capacityValue = value.Fields.GetValueOrDefault("capacity", Scalar.From(100));
@@ -105,31 +114,29 @@ public static class SymbolPresentation
                 throw new ArgumentException("Vessel value/capacity require numbers and displayValueAsPercent requires a Boolean.");
             var n = numberValue.Number; var capacity = capacityValue.Number;
             if (!double.IsFinite(capacity) || capacity <= 0) throw new ArgumentException("Vessel capacity must be positive.");
-            var percent = displayPercent.Boolean;
-            readout = readout with { Text = NumericInputText.FormatDouble(percent ? Fraction(n, 0, capacity) * 100 : n) + (percent ? "%" : "") };
+            readout = readout with { Text = NumericInputText.FormatDouble(displayPercent.Boolean ? Fraction(n, 0, capacity) * 100 : n) + (displayPercent.Boolean ? "%" : "") };
         }
         var result = new SymbolOptions
         {
-            Appearance = appearance, State = state, AnimationSpeed = defaults.ReducedMotion ? 0 : animation,
+            Appearance = appearance, State = state, StateStyle = stateStyle, AnimationSpeed = defaults.ReducedMotion ? 0 : animation,
             Orientation = Text("orientation", type == "Vessel" ? "vertical" : "right"), Variant = Text("variant", "centrifugal"), Feet = Text("feet", "bottom"),
             ReverseFlow = Flag("reverseFlow", false), DisplayStand = Flag("displayStand", true), DisplayAgitator = Flag("displayAgitator", true), DisplayFillLevel = Flag("displayFillLevel", true),
-            LiquidOpacity = Number("liquidOpacity", .7), LiquidColor = Text("liquidColor", "#00ACAC"), LiquidWarningColor = Text("liquidWarningColor", "#D88837"), Label = label, Readout = readout
+            LiquidOpacity = Number("liquidOpacity", .7), LiquidColor = Text("liquidColor", stateStyle?.TertiaryColor ?? "#00ACAC"), LiquidWarningColor = Text("liquidWarningColor", "#D88837"), Label = label, Readout = readout
         };
         result.Validate(type); return result;
     }
-    public static SymbolText Annotation(Scalar value)
+    public static SymbolText Annotation(Scalar value, string defaultColor = "#333333")
     {
-        if (value.Kind == ScalarKind.Null) return new();
-        if (value.Kind == ScalarKind.String) { var plain = new SymbolText(value.Text!); plain.Validate(); return plain; }
+        if (value.Kind == ScalarKind.Null) return new(Color: defaultColor);
+        if (value.Kind == ScalarKind.String) { var plain = new SymbolText(value.Text!, Color: defaultColor); plain.Validate(); return plain; }
         if (value.Kind != ScalarKind.Object) throw new ArgumentException("A symbol annotation requires an object or text.");
         var f = value.Fields;
         string Text(string key, string fallback) => f.TryGetValue(key, out var v) ? v.Kind == ScalarKind.String ? v.Text! : throw new ArgumentException("Annotation " + key + " must be a string.") : fallback;
         var style = f.GetValueOrDefault("style", Scalar.Object([]));
         if (style.Kind != ScalarKind.Object) throw new ArgumentException("Annotation style must be an object.");
-        // Unsupported CSS is diagnosed rather than presented as implemented.
         if (style.Fields.Keys.Any(k => k is not ("color" or "fontSize"))) throw new ArgumentException("Symbol text style supports color and fontSize only.");
         var size = style.Fields.GetValueOrDefault("fontSize", Scalar.From(13));
-        var color = style.Fields.GetValueOrDefault("color", Scalar.From("#333333"));
+        var color = style.Fields.GetValueOrDefault("color", Scalar.From(defaultColor));
         if (size.Kind != ScalarKind.Number || color.Kind != ScalarKind.String) throw new ArgumentException("Invalid annotation style types.");
         var result = new SymbolText(Text("text", ""), Text("location", "bottom"), Text("justify", "center"), size.Number, color.Text!); result.Validate(); return result;
     }
@@ -137,7 +144,6 @@ public static class SymbolPresentation
     {
         if (!double.IsFinite(value) || !double.IsFinite(minimum) || !double.IsFinite(maximum) || maximum <= minimum) throw new ArgumentException("Symbol range requires finite values and increasing bounds.");
         if (value <= minimum) return 0; if (value >= maximum) return 1;
-        // Direct subtraction is accurate for close values; scale only when subtraction overflows.
         var span = maximum - minimum;
         return double.IsFinite(span) ? (value - minimum) / span : (value / 2 - minimum / 2) / (maximum / 2 - minimum / 2);
     }

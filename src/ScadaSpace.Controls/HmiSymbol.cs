@@ -9,7 +9,7 @@ using Windows.Foundation;
 
 namespace ScadaSpace.Controls;
 
-/// <summary>Native vector symbol with one retained drawing picture; idle refreshes do not repaint unchanged symbols.</summary>
+/// <summary>Native vector symbol with retained state pictures and demand-driven, viewport-culled effects.</summary>
 public partial class HmiSymbol : SKCanvasElement, IDisposable
 {
     private static DependencyProperty Register<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors | DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.PublicProperties)] T>(string name, T value) => DependencyProperty.Register(name, typeof(T), typeof(HmiSymbol), new PropertyMetadata(value, (o, _) => ((HmiSymbol)o).Changed()));
@@ -37,9 +37,11 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
     public string? RenderError { get; private set; }
     public string? DataError { get; private set; }
     public long PictureBuildCount => _cache.PictureBuildCount;
+    public int RetainedPictureCount => _cache.RetainedPictureCount;
+    public bool LastAlternateFill { get; private set; }
     public long RenderCount => _cache.DrawCount;
     public long AnimationInvalidations { get; private set; }
-    public bool Animating => !_disposed && AllowAnimation && IsLoaded && DataError is null && Quality == Quality.Good && Data.Options?.IsAnimated == true && IndustrialSymbolRenderer.Supports(Kind);
+    public bool Animating => !_disposed && AllowAnimation && IsLoaded && DataError is null && Quality == Quality.Good && Data.Options?.NeedsAnimation == true && IndustrialSymbolRenderer.Supports(Kind);
     public HmiSymbol()
     {
         Loaded += (_, _) => { SymbolAnimation.Update(this); Invalidate(); };
@@ -63,7 +65,6 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
         if (DataError == message && _errorQuality == quality) return;
         DataError = message; _errorQuality = quality; AutomationProperties.SetHelpText(this, message ?? ""); Changed();
     }
-    /// <summary>Conservative root/scroll viewport intersection; partially visible symbols are retained.</summary>
     public bool IsInAnimationViewport
     {
         get
@@ -78,8 +79,7 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
                     if (element is Microsoft.UI.Xaml.Controls.ScrollViewer scroll)
                     {
                         var clip = scroll.TransformToVisual(null).TransformBounds(new Rect(0, 0, scroll.ActualWidth, scroll.ActualHeight));
-                        left = Math.Max(left, clip.Left); top = Math.Max(top, clip.Top);
-                        right = Math.Min(right, clip.Right); bottom = Math.Min(bottom, clip.Bottom);
+                        left = Math.Max(left, clip.Left); top = Math.Max(top, clip.Top); right = Math.Min(right, clip.Right); bottom = Math.Min(bottom, clip.Bottom);
                     }
                 }
                 var bounds = TransformToVisual(null).TransformBounds(new Rect(0, 0, ActualWidth, ActualHeight));
@@ -89,19 +89,21 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
         }
     }
     internal void AnimateFrame()
-    {
-        if (!Animating || !IsInAnimationViewport) return;
-        AnimationInvalidations++; Invalidate();
-    }
+    { if (!Animating || !IsInAnimationViewport) return; AnimationInvalidations++; Invalidate(); }
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
-        if (_disposed) return;
-        var bounds = SKRect.Create((float)area.Width, (float)area.Height);
+        if (_disposed) return; var bounds = SKRect.Create((float)area.Width, (float)area.Height);
         try
         {
             if (DataError is not null) { SymbolRenderer.DrawQuality(canvas, bounds, _errorQuality); RenderError = DataError; return; }
-            _snapshot ??= Data with { Value = Value, Minimum = Minimum, Maximum = Maximum, Unit = Unit, Color = SymbolColor, Quality = Quality };
-            _cache.Draw(canvas, bounds, Kind, _snapshot, AllowAnimation ? SymbolAnimation.ElapsedSeconds : 0);
+            _snapshot ??= Data with
+            {
+                Value = Value, Minimum = Minimum, Maximum = Maximum, Unit = Unit, Color = SymbolColor, Quality = Quality,
+                Options = !AllowAnimation && Data.Options is { } options ? options with { AnimationSpeed = 0 } : Data.Options
+            };
+            var elapsed = AllowAnimation ? SymbolAnimation.ElapsedSeconds : 0;
+            _cache.Draw(canvas, bounds, Kind, _snapshot, elapsed);
+            LastAlternateFill = Quality == Quality.Good && _snapshot.Options?.AlternateFill(elapsed) == true;
             RenderError = null;
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException or OverflowException)

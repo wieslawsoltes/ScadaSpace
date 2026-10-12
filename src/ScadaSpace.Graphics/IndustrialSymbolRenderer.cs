@@ -5,7 +5,7 @@ namespace ScadaSpace.Graphics;
 
 public readonly record struct SymbolArrangement(SKRect Body, SKRect Label, SKRect Readout);
 
-/// <summary>Independent vector drawings of the documented industrial families. Normalized geometry, gravity-aligned liquid, upright text.</summary>
+/// <summary>Independent normalized vector artwork with upright annotations and resolved theme materials.</summary>
 public static partial class IndustrialSymbolRenderer
 {
     private static readonly SKColor Outline = SKColor.Parse("#606060"), Shell = SKColor.Parse("#F4F4F4"), Metal = SKColor.Parse("#BEBEBE");
@@ -28,10 +28,8 @@ public static partial class IndustrialSymbolRenderer
             }
             return slot;
         }
-        // Captions precede readouts in reading order even when both reserve bottom space.
         SKRect label, readout;
-        if (options.Label.Location == "bottom" && options.Readout.Location == "bottom")
-        { readout = Reserve(options.Readout); label = Reserve(options.Label); }
+        if (options.Label.Location == "bottom" && options.Readout.Location == "bottom") { readout = Reserve(options.Readout); label = Reserve(options.Label); }
         else { label = Reserve(options.Label); readout = Reserve(options.Readout); }
         return new(body, label, readout);
     }
@@ -42,7 +40,9 @@ public static partial class IndustrialSymbolRenderer
         var w = Math.Min(area.Width, area.Height * ratio); var h = w / ratio;
         return SKRect.Create(area.MidX - w / 2, area.MidY - h / 2, Math.Max(0, w), Math.Max(0, h));
     }
-    private static SKColor StateColor(SymbolOptions o) => o.IsFaulted ? SKColor.Parse("#C43D35") : o.State == "partiallyClosed" ? SKColor.Parse("#C28A25") : o.IsRunning ? SKColor.Parse("#258748") : Outline;
+    private static SKColor StateColor(SymbolOptions o) => o.StateStyle is { } style ? Color(style.StrokeColor)
+        : o.IsFaulted ? SKColor.Parse("#C43D35") : o.State == "partiallyClosed" ? SKColor.Parse("#C28A25") : o.IsRunning ? SKColor.Parse("#258748") : Outline;
+    private static SKColor Surface(CanvasPainter p) => p.SymbolStyle is { } style ? Color(p.AlternateSymbolFill ? style.SecondaryColor : style.PrimaryColor) : Shell;
     private static float Rotation(string orientation) => orientation switch { "left" => 180, "top" => -90, "bottom" => 90, _ => 0 };
     private static bool BeginBody(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolOptions o)
     {
@@ -51,40 +51,32 @@ public static partial class IndustrialSymbolRenderer
         if (kind != SymbolKind.Vessel) canvas.RotateDegrees(Rotation(o.Orientation) + (kind == SymbolKind.Valve ? 90 : 0), 50, 50);
         return true;
     }
-    public static void DrawStatic(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolData data)
+    public static void DrawStatic(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolData data, bool alternateFill = false)
     {
         var o = data.Options ?? new SymbolOptions { Orientation = kind == SymbolKind.Vessel ? "vertical" : "right", State = data.Value != 0 ? kind == SymbolKind.Valve ? "open" : "running" : kind == SymbolKind.Valve ? "closed" : "stopped" };
-        o.Validate(kind.ToString());
-        var save = canvas.Save();
+        o.Validate(kind.ToString()); var save = canvas.Save();
         try
         {
-            canvas.ClipRect(bounds); using var p = new CanvasPainter(canvas);
+            canvas.ClipRect(bounds); using var p = new CanvasPainter(canvas) { SymbolStyle = o.StateStyle, AlternateSymbolFill = alternateFill };
             var bodySave = canvas.Save();
             try
             {
-                if (BeginBody(canvas, bounds, kind, o))
-                    switch (kind)
-                    {
-                        case SymbolKind.Pump: Pump(p, o); break;
-                        case SymbolKind.Motor: Motor(p, o); break;
-                        case SymbolKind.Valve: Valve(p, o); break;
-                        case SymbolKind.Sensor: Sensor(p, o); break;
-                        case SymbolKind.Vessel: Vessel(p, o, data); break;
-                    }
+                if (BeginBody(canvas, bounds, kind, o)) switch (kind)
+                {
+                    case SymbolKind.Pump: Pump(p, o); break; case SymbolKind.Motor: Motor(p, o); break;
+                    case SymbolKind.Valve: Valve(p, o); break; case SymbolKind.Sensor: Sensor(p, o); break; case SymbolKind.Vessel: Vessel(p, o, data); break;
+                }
             }
             finally { canvas.RestoreToCount(bodySave); }
             var layout = Arrange(bounds, o); Text(p, layout.Label, o.Label, Quality.Good); Text(p, layout.Readout, o.Readout, data.Quality);
             if (o.IsFaulted)
-            {
-                var x = bounds.Right - 10; p.Circle(x, bounds.Top + 10, 7, StateColor(o)); p.Text("!", x, bounds.Top + 14, 11, SKColors.White, SKTextAlign.Center);
-            }
+            { var x = bounds.Right - 10; p.Circle(x, bounds.Top + 10, 7, StateColor(o)); p.Text("!", x, bounds.Top + 14, 11, SKColors.White, SKTextAlign.Center); }
         }
         finally { canvas.RestoreToCount(save); }
     }
     private static void Text(CanvasPainter p, SKRect r, SymbolText text, Quality quality)
     {
-        if (r.IsEmpty) return;
-        var save = p.Canvas.Save();
+        if (r.IsEmpty) return; var save = p.Canvas.Save();
         try
         {
             p.Canvas.ClipRect(r);
@@ -97,11 +89,20 @@ public static partial class IndustrialSymbolRenderer
     }
     private static void Shape(CanvasPainter p, SKPath path, SKColor color, bool mimic)
     {
-        p.Path(path, mimic ? Metal : Shell);
+        var surface = Surface(p); p.Path(path, p.SymbolStyle is not null ? surface : mimic ? Metal : Shell);
         if (mimic)
         {
             var save = p.Canvas.Save();
-            try { p.Canvas.ClipPath(path, antialias: true); p.Gradient(path.Bounds, SKColor.Parse("#9E9E9E"), SKColor.Parse("#FAFAFA"), SKColor.Parse("#B9B9B9")); }
+            try
+            {
+                p.Canvas.ClipPath(path, antialias: true);
+                if (p.SymbolStyle is not null)
+                {
+                    var highlight = new SKColor((byte)(surface.Red + (255 - surface.Red) * .35), (byte)(surface.Green + (255 - surface.Green) * .35), (byte)(surface.Blue + (255 - surface.Blue) * .35), surface.Alpha);
+                    p.Gradient(path.Bounds, surface, highlight, surface);
+                }
+                else p.Gradient(path.Bounds, SKColor.Parse("#9E9E9E"), SKColor.Parse("#FAFAFA"), SKColor.Parse("#B9B9B9"));
+            }
             finally { p.Canvas.RestoreToCount(save); }
         }
         p.Path(path, color, true, 1.8f);

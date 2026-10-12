@@ -8,8 +8,7 @@ public partial class ViewHost
     private HmiSymbol BuildSymbol(ComponentNode node, SymbolKind kind)
     {
         var symbol = new HmiSymbol { Kind = kind, AllowAnimation = !IsEditing };
-        var presentation = new SymbolPresentationCache();
-        var quality = Quality.Good;
+        var presentation = new SymbolPresentationCache(); var quality = Quality.Good;
         Scalar ReadValue(string key)
         {
             var sample = Read(node, key);
@@ -39,9 +38,9 @@ public partial class ViewHost
                 var minimum = Numeric("minimum", 0); var maximum = Numeric("maximum", 100);
                 if (kind == SymbolKind.Vessel && value.Kind == ScalarKind.Object) maximum = value.Fields.GetValueOrDefault("capacity", Scalar.From(maximum)).AsNumber();
                 if (kind == SymbolKind.Tank) maximum = Numeric("capacity", maximum);
-                var options = IndustrialSymbolRenderer.Supports(kind) ? presentation.Read(node.Type, read, Session!.Symbols, number) : null;
+                var options = IndustrialSymbolRenderer.Supports(kind) ? presentation.Read(node.Type, read, Session!.Symbols, number, Runtime!.Project.SymbolStates) : null;
                 var data = new SymbolData(number, minimum, maximum, TextValue("unit", ""), TextValue("liquidColor", TextValue("color", "#48AFC0")), TextValue("format", "0.0"),
-                    TextValue("route", "elbow"), Numeric("strokeWidth", 1), TextValue("stroke", "#9DAAB2"), Numeric("radius", 0), Numeric("warning", 85), Quality.Good, options, kind == SymbolKind.Tank ? TankOptions.Read(ReadValue) : null);
+                    TextValue("route", "elbow"), Numeric("strokeWidth", 1), TextValue("stroke", "#9DAAB2"), Numeric("radius", 0), Numeric("warning", 85), Quality.Good, options, kind == SymbolKind.Tank ? TankOptions.Read(read) : null);
                 SymbolRenderer.Validate(SkiaSharp.SKRect.Create(100, 100), kind, data);
                 symbol.SetSnapshot(data); symbol.SetDiagnostic(null);
             }
