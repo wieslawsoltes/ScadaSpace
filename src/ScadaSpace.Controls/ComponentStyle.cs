@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ScadaSpace.Core;
 using Windows.UI.Text;
+using FontWeights = Microsoft.UI.Text.FontWeights;
 
 namespace ScadaSpace.Controls;
 

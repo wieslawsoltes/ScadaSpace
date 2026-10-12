@@ -9,9 +9,10 @@ using Windows.UI;
 namespace ScadaSpace.Controls;
 
 /// <summary>Typed style input with an explicit inherited state and a lazily constructed color flyout.</summary>
-public sealed partial class StyleValueEditor : Grid
+public sealed partial class StyleValueEditor : UserControl
 {
     private const string Inherit = "(inherit)";
+    private readonly Grid _layout = new() { ColumnSpacing = 3 };
     private readonly TextBox? _input;
     private readonly ComboBox? _choice;
     private readonly Button? _swatch;
@@ -60,7 +61,7 @@ public sealed partial class StyleValueEditor : Grid
     {
         Property = property ?? throw new ArgumentNullException(nameof(property));
         _auxiliaryView = new(_auxiliary);
-        ColumnSpacing = 3; ColumnDefinitions.Add(new());
+        IsTabStop = false; Content = _layout; _layout.ColumnDefinitions.Add(new());
         var options = Options(property.Name);
         if (options.Length > 0)
         {
@@ -83,19 +84,19 @@ public sealed partial class StyleValueEditor : Grid
             };
             InputElement = _input;
         }
-        Children.Add(InputElement);
+        _layout.Children.Add(InputElement);
         AutomationProperties.SetName(InputElement, property.Name);
         ToolTipService.SetToolTip(InputElement, property.Hint + ". Blank / (inherit) removes this class property.");
         if (property.Name is "foreground" or "background" or "borderColor")
         {
-            ColumnDefinitions.Add(new() { Width = new GridLength(27) });
+            _layout.ColumnDefinitions.Add(new() { Width = new GridLength(27) });
             _swatch = ControlTheme.Button("…", () => OpenColorPicker());
             _swatch.Padding = new Thickness(1); _swatch.MinWidth = 0;
-            Grid.SetColumn(_swatch, 1); Children.Add(_swatch); Track("color", _swatch, "Choose " + property.Name + " color");
+            Grid.SetColumn(_swatch, 1); _layout.Children.Add(_swatch); Track("color", _swatch, "Choose " + property.Name + " color");
         }
-        ColumnDefinitions.Add(new() { Width = new GridLength(25) });
+        _layout.ColumnDefinitions.Add(new() { Width = new GridLength(25) });
         var reset = ControlTheme.Button("×", () => Text = ""); reset.Padding = new Thickness(1); reset.MinWidth = 0;
-        Grid.SetColumn(reset, ColumnDefinitions.Count - 1); Children.Add(reset); Track("reset", reset, "Inherit " + property.Name);
+        Grid.SetColumn(reset, _layout.ColumnDefinitions.Count - 1); _layout.Children.Add(reset); Track("reset", reset, "Inherit " + property.Name);
         UpdateSwatch();
         Unloaded += (_, _) => _flyout?.Hide();
     }
