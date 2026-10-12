@@ -93,7 +93,9 @@ with sync_playwright() as p:
         check('Project menu opens the native style class list and grouped editor',editor()['selected']=='Alpha' and editor()['classes']==['Alpha','Zulu'])
         choose('Zulu');field('foreground','#775511');wait("window.scadaApp.styleEditor.previewForeground==='#FF775511'")
         check('valid style field changes update the native preview without changing the document',native('Styled')['foreground']=='#FFAA2233' and not app()['dirty'])
-        check('color and inheritance buttons retain usable native hit targets',editor()['inputs']['foreground']['controls']['color']['width']>=24 and editor()['inputs']['foreground']['controls']['reset']['width']>=24)
+        control_bounds=editor()['inputs']['foreground']['controls']; viewport=editor()['fields']['settings-viewport']
+        check('color and inheritance buttons retain usable native hit targets',control_bounds['color']['width']>=24 and control_bounds['reset']['width']>=24
+              and control_bounds['reset']['x']+control_bounds['reset']['width']<=viewport['x']+viewport['width']-12)
         option('fontWeight','Bold');wait('window.scadaApp.styleEditor.previewFontWeight===700')
         check('native font-weight choices update only the staged preview',not app()['dirty'] and editor()['inputs']['fontWeight']['text']=='Bold')
         auxiliary('fontWeight','reset');wait('window.scadaApp.styleEditor.previewFontWeight===400')

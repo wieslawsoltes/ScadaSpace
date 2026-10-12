@@ -27,7 +27,8 @@ public sealed partial class StyleClassEditor : Grid
     private readonly TextBlock _error = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = ControlTheme.Brush("#A73828") };
     private readonly TextBlock _sample = new() { Text = "Process heading\nTank 01 · 72.5 %", TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _preview = new() { MinHeight = 160, Margin = new Thickness(0, 8, 0, 12) };
-    private readonly StackPanel _form = new() { Spacing = 4 };
+    // Keep the action column clear of the native vertical scrollbar overlay.
+    private readonly StackPanel _form = new() { Spacing = 4, Margin = new Thickness(0, 0, 24, 0) };
     private bool _sync, _assignmentTouched;
     private string? _selected;
     public IReadOnlyDictionary<string, FrameworkElement> EditorFields => _fields;
@@ -47,7 +48,8 @@ public sealed partial class StyleClassEditor : Grid
         var inventory = new Grid { Padding = new Thickness(8), Background = ControlTheme.Brush("#DFE3E6") };
         inventory.RowDefinitions.Add(new() { Height = new GridLength(28) }); inventory.RowDefinitions.Add(new() { Height = new GridLength(36) }); inventory.RowDefinitions.Add(new());
         inventory.Children.Add(ControlTheme.Text("Style Classes", 14)); Grid.SetRow(_filter, 1); inventory.Children.Add(_filter); Grid.SetRow(_classes, 2); inventory.Children.Add(_classes); Children.Add(inventory);
-        var settings = new ScrollViewer { Content = _form, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var settings = new ScrollViewer { Content = _form, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        Track("settings-viewport", settings);
         _form.Children.Add(ControlTheme.Text("Edit Style", 17));
         _form.Children.Add(new TextBlock { Text = "Leave a field blank to inherit. Changes are staged until Apply or OK.", FontSize = 11, TextWrapping = TextWrapping.Wrap });
         foreach (var group in StyleRules.Properties.GroupBy(p => p.Group))
