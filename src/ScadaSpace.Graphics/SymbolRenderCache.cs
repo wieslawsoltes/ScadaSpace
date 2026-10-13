@@ -16,6 +16,8 @@ public static partial class SymbolRenderer
         NumberFormatting.Validate(data.Format);
         if (kind is SymbolKind.Tank or SymbolKind.Vessel && data.Maximum <= 0) throw new ArgumentException("Tank and vessel capacity must be positive.");
         data.Options?.Validate(kind.ToString()); data.Tank?.Validate();
+        if (kind == SymbolKind.LEDDisplay)
+        { data.Led?.Validate(); if (data.Unit is null || data.Unit.Length > 128) throw new ArgumentException("LED units are limited to 128 characters."); }
     }
     public static void Draw(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolData data)
     {
@@ -27,6 +29,7 @@ public static partial class SymbolRenderer
     internal static void DrawBase(SKCanvas canvas, SKRect bounds, SymbolKind kind, SymbolData data, bool alternateFill = false)
     {
         if (IndustrialSymbolRenderer.Supports(kind)) IndustrialSymbolRenderer.DrawStatic(canvas, bounds, kind, data, alternateFill);
+        else if (kind == SymbolKind.LEDDisplay) LedDisplayRenderer.Draw(canvas, bounds, LedDisplayRenderer.Resolve(data), data.Quality, data.Unit);
         else DrawLegacy(canvas, DisplayBounds(bounds, kind), kind, data);
         if (data.Quality != Quality.Good) DrawQuality(canvas, bounds, data.Quality);
     }

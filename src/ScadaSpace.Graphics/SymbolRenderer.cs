@@ -5,7 +5,7 @@ using SkiaSharp;
 namespace ScadaSpace.Graphics;
 
 public enum SymbolKind { Tank, Gauge, Thermometer, LEDDisplay, Pipe, Pump, Valve, Motor, Rectangle, Ellipse, Line, Sensor, Vessel }
-public sealed record SymbolData(double Value = 0, double Minimum = 0, double Maximum = 100, string Unit = "", string Color = "#48AFC0", string Format = "0.0", string Route = "elbow", double StrokeWidth = 1, string Stroke = "#9DAAB2", double Radius = 0, double Warning = 85, Quality Quality = Quality.Good, SymbolOptions? Options = null, TankOptions? Tank = null);
+public sealed record SymbolData(double Value = 0, double Minimum = 0, double Maximum = 100, string Unit = "", string Color = "#48AFC0", string Format = "0.0", string Route = "elbow", double StrokeWidth = 1, string Stroke = "#9DAAB2", double Radius = 0, double Warning = 85, Quality Quality = Quality.Good, SymbolOptions? Options = null, TankOptions? Tank = null, LedDisplaySnapshot? Led = null);
 
 public static partial class SymbolRenderer
 {
@@ -33,8 +33,6 @@ public static partial class SymbolRenderer
             case SymbolKind.Thermometer:
                 canvas.Scale(bounds.Width / 100, bounds.Height / 220);
                 Thermometer(p, data, (float)f, color); break;
-            case SymbolKind.LEDDisplay:
-                Led(p, bounds.Width, bounds.Height, data); break;
             case SymbolKind.Pipe:
                 Pipe(p, bounds.Width, bounds.Height, data, color); break;
             case SymbolKind.Rectangle:
@@ -75,24 +73,6 @@ public static partial class SymbolRenderer
         for (var i = 0; i <= 5; i++) { var y = 176 - i * 31; p.Line(52, y, 60, y, Ink); p.Text((d.Minimum * (1-i/5d) + d.Maximum * (i/5d)).ToString("0", CultureInfo.InvariantCulture), 64, y + 4, 11, Ink); }
         p.Text(d.Quality == Quality.Good ? d.Value.ToString("0.0", CultureInfo.InvariantCulture) + d.Unit : "—", 46, 217, 13, Ink, SKTextAlign.Center);
     }
-    private static void Led(CanvasPainter p, float width, float height, SymbolData d)
-    {
-        p.Rect(SKRect.Create(0, 0, width, height), SKColor.Parse("#22332D"), 3);
-        var text = d.Quality == Quality.Good ? d.Value.ToString(d.Format, CultureInfo.InvariantCulture) : "----";
-        if (text.Length > 12) text = "----";
-        var scale = Math.Min((width - 16) / Math.Max(1, TextWidth(text)), (height - (string.IsNullOrEmpty(d.Unit) ? 12 : 27)) / 48);
-        p.Canvas.Save(); p.Canvas.Translate(8, 6); p.Canvas.Scale(Math.Max(0.1f, scale));
-        foreach (var ch in text)
-        {
-            if (ch == '.') { p.Circle(4, 44, 2.5f, SKColor.Parse("#8CEE87")); p.Canvas.Translate(12, 0); continue; }
-            var mask = ch switch { '0' => 0x3f, '1' => 0x06, '2' => 0x5b, '3' => 0x4f, '4' => 0x66, '5' => 0x6d, '6' => 0x7d, '7' => 0x07, '8' => 0x7f, '9' => 0x6f, '-' => 0x40, _ => 0 };
-            var segments = LedSegments;
-            for (var i = 0; i < segments.Length; i++) { var s = segments[i]; p.Line(s.X1, s.Y1, s.X2, s.Y2, SKColor.Parse(mask != 0 && (mask & (1 << i)) != 0 ? "#8CEE87" : "#30473B"), 3); }
-            p.Canvas.Translate(30, 0);
-        }
-        p.Canvas.Restore();
-        if (!string.IsNullOrEmpty(d.Unit)) p.Text(d.Unit, width - 8, height - 6, 12, SKColor.Parse("#AACCB7"), SKTextAlign.Right);
-    }
     private static void Pipe(CanvasPainter p, float w, float h, SymbolData d, SKColor color)
     {
         var lineWidth = (float)Math.Clamp(d.StrokeWidth, 2, Math.Max(2, Math.Min(w, h) - 2));
@@ -103,8 +83,6 @@ public static partial class SymbolRenderer
         p.Path(path, d.Value != 0 ? color : Pale, true, lineWidth);
         if (d.Value != 0) p.Polygon(SKColors.White.WithAlpha(210), new(w - 22, h - (d.Route == "straight" ? h / 2 : lineWidth) - 3), new(w - 16, h - (d.Route == "straight" ? h / 2 : lineWidth)), new(w - 22, h - (d.Route == "straight" ? h / 2 : lineWidth) + 3));
     }
-    private static readonly (float X1, float Y1, float X2, float Y2)[] LedSegments = [(6, 2, 21, 2), (24, 5, 24, 20), (24, 27, 24, 42), (6, 45, 21, 45), (3, 27, 3, 42), (3, 5, 3, 20), (6, 23, 21, 23)];
-    private static int TextWidth(string text) { var width = 0; foreach (var ch in text) width += ch == '.' ? 12 : 30; return width; }
     public static void DrawQuality(SKCanvas canvas, SKRect bounds, Quality quality)
     {
         ArgumentNullException.ThrowIfNull(canvas);

@@ -8,7 +8,7 @@ from native_readiness import CommandReadiness
 
 class RunnerTests(unittest.TestCase):
     def test_registry_contains_each_application_suite_once(self):
-        self.assertEqual(len(SUITES),11)
+        self.assertEqual(len(SUITES),12)
         self.assertEqual(len(set(SUITES)),len(SUITES))
         for name in SUITES:self.assertTrue(Path(__file__).with_name(name+'.py').is_file())
     def test_invalid_concurrency_is_rejected_before_work(self):

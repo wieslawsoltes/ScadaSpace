@@ -67,7 +67,8 @@ public partial class ComponentPalette : Grid
         if (!Enum.TryParse<SymbolKind>(descriptor.Type, out var kind)) return new DesignerIcon(descriptor.Category, 18);
         var symbol = new HmiSymbol { Kind = kind, Width = 18, Height = 18, AllowAnimation = false, IsHitTestVisible = false };
         symbol.SetSnapshot(new(Value: 45, Options: IndustrialSymbolRenderer.Supports(kind) ? new() { Appearance = "simple", Orientation = kind == SymbolKind.Vessel ? "vertical" : "right" } : null,
-            Tank: kind == SymbolKind.Tank ? new(ShowValue: false, ShowScale: false) : null));
+            Tank: kind == SymbolKind.Tank ? new(ShowValue: false, ShowScale: false) : null,
+            Led: kind == SymbolKind.LEDDisplay ? LedDisplayPresentation.Create(Scalar.From(45), new()) : null));
         return symbol;
     }
     public void ExpandAll(bool expanded) {foreach(var group in _groups)group.Expanded=expanded;Filter();}
