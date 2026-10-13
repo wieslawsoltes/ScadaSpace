@@ -6,7 +6,7 @@ The LED Display component now draws seven- and fourteen-segment readouts using i
 
 New palette components use `segmentFormat: "14 segment"`, `numberFormat: "#,##0.00"`, `locale: "en-US"`, `backgroundColor: "#161616"`, `diodeOnColor: "#1EC963"` and an independently chosen inactive color `#193B29`. They remain the existing LEDDisplay type, not an additional catalog entry. Palette thumbnails use the same actual renderer.
 
-Older definitions without segmentFormat retain the previous seven-segment mode, background `#22332D`, active `#8CEE87`, inactive `#30473B` and their existing `format` property (default `0.0`). Explicit `numberFormat` takes precedence over the legacy `format` alias. Adding segmentFormat opts into the new presentation defaults unless colors/format are explicitly supplied. No existing serialized project is rewritten just by rendering it.
+Older definitions without segmentFormat retain the previous seven-segment mode, background `#22332D`, active `#8CEE87`, inactive `#30473B` and their existing `format` property (default `0.0`). Explicit `numberFormat` takes precedence over the legacy `format` alias. Adding segmentFormat opts into the new presentation defaults unless colors/format are explicitly supplied. Legacy Boolean sources retain their previous numeric 0/1 presentation; explicitly configured new displays require numeric or supported text values. No existing serialized project is rewritten just by rendering it.
 
 The value accepts a number or, as a ScadaSpace extension, supported segment text. Numeric formatting changes presentation only, not the bound value. Fourteen-segment mode covers all ASCII A–Z letters in either case using uppercase-shaped glyphs, decimal/comma marks, colon, minus, plus, slash, degree, percent and spaces. Seven-segment mode has its naturally limited letter subset; unsupported characters generate an explicit diagnostic rather than silently blanking a digit. Arabic-Indic/Persian digits map to the corresponding digit geometry, and common Arabic number separators and invisible numeric direction marks are recognized. This is not an arbitrary Unicode text renderer or a complete right-to-left shaping engine.
 
@@ -24,7 +24,7 @@ The reusable numeric HmiSymbol.Value dependency property still updates a numeric
 
 ## Reusable rendering and performance
 
-Core owns LedDisplayOptions, LedDisplaySnapshot, LedDisplayPresentation, LedDisplayPresentationCache and LedGlyphs. Graphics owns LedDisplayRenderer and the reused CanvasPainter diode path. Controls owns the existing HmiSymbol/PropertyInspector integration. No rendering or formatting logic requires the application shell.
+Core owns LedDisplayOptions, LedDisplaySnapshot, LedDisplayPresentation, LedDisplayPresentationCache and LedGlyphs. Graphics owns LedDisplayRenderer and the reused CanvasPainter diode path. Controls owns the existing HmiSymbol/PropertyInspector integration. No rendering or formatting logic requires the application shell. ViewHost allocates a presentation cache only for the relevant renderer family; tanks, pipes and primitives do not allocate unused LED/industrial parsing caches.
 
 ```csharp
 var presentation = LedDisplayPresentation.Create(

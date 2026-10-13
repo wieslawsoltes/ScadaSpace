@@ -73,6 +73,8 @@ public static class LedDisplayPresentation
             Text(read("diodeOffColor"), defaults.DiodeOffColor, "diodeOffColor"),
             Text(read("locale"), defaults.Locale, "locale"));
         var value = read("value");
+        // Older ViewHost numeric displays accepted Boolean sources through AsNumber.
+        if (legacy && value.Kind == ScalarKind.Boolean) value = Scalar.From(value.Boolean ? 1 : 0);
         return Create(value.Kind == ScalarKind.Null ? Scalar.From(0) : value, options);
     }
 }
