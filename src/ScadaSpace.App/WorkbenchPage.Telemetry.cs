@@ -86,11 +86,19 @@ public sealed partial class WorkbenchPage
             inspectorFilter = new
             {
                 query = _inspector.FilterQuery, boundOnly = _inspector.FilterBoundOnly,
+                syntax = _inspector.FilterSyntax.ToString(), mode = _inspector.FilterMatchMode.ToString(),
+                caseSensitive = _inspector.FilterCaseSensitive, error = _inspector.FilterError,
+                matches = _inspector.MatchingPropertyPaths, categories = _inspector.CategoryStates,
+                headers = _inspector.CategoryHeaders.ToDictionary(p => p.Key, p => Bounds(p.Value)),
+                patternBuilds = _inspector.FilterPatternBuildCount,
+                options = _inspector.IsSearchOptionsOpen ? _inspector.SearchOptions.ToDictionary(p => p.Key, p => new
+                { bounds = Bounds(p.Value), selected = p.Value is ToggleMenuFlyoutItem toggle && toggle.IsChecked }) : null,
                 visible = _inspector.VisiblePropertyPaths, total = _inspector.PropertyCount,
                 noMatches = _inspector.FilterHasNoMatches, summary = _inspector.FilterSummary,
                 rowsCreated = _inspector.PropertyRowsCreated, builds = _inspector.FilterBuildCount, applies = _inspector.FilterApplyCount,
                 controls = _inspector.FilterCommands.ToDictionary(p => p.Key, p => Bounds(p.Value))
             },
+            inspectorQualified = _inspector.QualifiedEditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             inspectorTyped = TypedInspectorTelemetry(Bounds),
             inspector = _inspector.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             inspectorChoices = _inspector.ChoiceEditors.ToDictionary(p => p.Key, p => new

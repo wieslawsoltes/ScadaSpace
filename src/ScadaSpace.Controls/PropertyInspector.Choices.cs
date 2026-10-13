@@ -26,7 +26,7 @@ public partial class PropertyInspector
             HorizontalAlignment = HorizontalAlignment.Stretch, Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF")
         };
         AutomationProperties.SetName(choice, property); AutomationProperties.SetAutomationId(choice, "inspector-" + property);
-        _choices[property] = choice; _editorFields[property] = choice;
+        _choices[property] = choice; RegisterPropertyEditor(property, choice);
         var owner = _document; var componentId = _id; var generation = owner?.Generation; var inspection = _inspectionVersion;
         choice.SelectionChanged += (_, _) =>
         {

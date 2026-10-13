@@ -80,19 +80,13 @@ public partial class PropertyInspector : Grid
         if (!double.IsFinite(value)) throw new FormatException("A finite value is required.");
         return value;
     }
-    private void Section(string name)
-    {
-        var border = new Border { Background = ControlTheme.Brush("#E8ECEF"), Padding = new Thickness(7, 5, 5, 5), Margin = new Thickness(0, 5, 0, 0), Child = ControlTheme.Text("▾  " + name, 10, "#526671") };
-        _fields.Children.Add(border); _filterSectionName = name.ToLowerInvariant();
-        _filterSection = new FilterSection(border); _filterSections.Add(_filterSection);
-    }
     private TextBox Field(string name, string text, Action<string> commit, Action? binding = null, bool bound = false)
     {
         var row = new Grid { MinHeight = 28, Background = ControlTheme.Brush("#FAFBFC") };
         row.ColumnDefinitions.Add(new() { Width = new GridLength(88) }); row.ColumnDefinitions.Add(new()); row.ColumnDefinitions.Add(new() { Width = new GridLength(binding is null ? 0 : 27) });
-        var label = ControlTheme.Text(name, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label);
+        var label = ControlTheme.Text(name, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label); ToolTipService.SetToolTip(label, name);
         var box = new TextBox { Text = text, FontSize = 11, MinHeight = 27, MinWidth = 0, Padding = new Thickness(4, 2, 4, 2), BorderThickness = new Thickness(0, 0, 0, 1), BorderBrush = ControlTheme.Brush("#E4E8EB"), Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF"), IsReadOnly = bound };
-        _editorFields[name] = box;
+        RegisterPropertyEditor(name, box);
         var original = text;
         var owner = _document; var componentId = _id; var generation = owner?.Generation; var inspection = _inspectionVersion;
         void Apply()

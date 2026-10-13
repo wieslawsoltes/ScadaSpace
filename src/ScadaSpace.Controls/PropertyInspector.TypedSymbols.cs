@@ -40,7 +40,7 @@ public partial class PropertyInspector
             textBox.FontSize = 11; textBox.MinHeight = 27; textBox.IsReadOnly = bound;
             AutomationProperties.SetName(textBox, property);
             ToolTipService.SetToolTip(editor.AuxiliaryControls["color"], "Choose " + property);
-            _colorEditors[property] = editor; _editorFields[property] = textBox;
+            _colorEditors[property] = editor; RegisterPropertyEditor(property, textBox);
             var original = value.Text!;
             void Apply()
             {
@@ -70,7 +70,7 @@ public partial class PropertyInspector
         else
         {
             var toggle = new CheckBox { IsChecked = value.Boolean, IsEnabled = !bound, MinHeight = 27, Padding = new Thickness(4, 0, 4, 0), FontSize = 11 };
-            AutomationProperties.SetName(toggle, property); _switchEditors[property] = toggle; _editorFields[property] = toggle;
+            AutomationProperties.SetName(toggle, property); _switchEditors[property] = toggle; RegisterPropertyEditor(property, toggle);
             void Apply()
             {
                 if (!Current() || toggle.IsChecked is not bool next || next == value.Boolean) return;
