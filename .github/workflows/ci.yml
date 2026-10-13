@@ -110,6 +110,7 @@ jobs:
             TestResults/browser-led
             TestResults/browser-symbol-editors
             TestResults/browser-symbol-colors
+            TestResults/browser-inspector-search
             TestResults/browser-runs
             TestResults/browser-globalization
             artifacts/globalization-build-properties.json
