@@ -119,3 +119,7 @@ MIT for ScadaSpace source. Referenced packages retain their respective licenses.
 ## LED displays
 
 Seven- and fourteen-segment vector readouts support locale-aware numeric formatting, bounded alphanumeric text, independent background/active/inactive colors, and native format dropdowns in the Property Editor. Existing project defaults remain compatible. See [LED options, reusable APIs and validation boundaries](docs/led-displays.md).
+
+## Typed symbol material inputs
+
+The flat Property Editor includes native color swatches with an alpha-aware Use/Cancel picker and checkboxes for supported vessel, valve and tank flags. Qualified bound inputs remain read-only; edits participate in normal Undo/Redo. See [typed symbol properties](docs/typed-symbol-properties.md).

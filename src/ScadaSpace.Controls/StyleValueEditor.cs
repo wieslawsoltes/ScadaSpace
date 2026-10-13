@@ -25,6 +25,8 @@ public sealed partial class StyleValueEditor : UserControl
     private bool _sync, _colorSync;
     private string _text = "";
     public event Action? ValueTextChanged;
+    /// <summary>Raised only when the user explicitly accepts a valid color in the flyout.</summary>
+    public event Action? ColorAccepted;
     public FrameworkElement InputElement { get; }
     public IReadOnlyDictionary<string, FrameworkElement> AuxiliaryControls => _auxiliaryView;
     public StyleProperty Property { get; }
@@ -32,11 +34,13 @@ public sealed partial class StyleValueEditor : UserControl
     public string ColorError => _colorError?.Text ?? "";
     public string Text
     {
-        get => _text;
+        // TextChanged is dispatched later than the TextBox dependency-property update.
+        // Enter/LostFocus must read the current input, not the last delivered notification.
+        get => _input?.Text ?? _text;
         set
         {
             ArgumentNullException.ThrowIfNull(value);
-            if (value == _text) return;
+            if (value == _text && (_input is null || _input.Text == value)) return;
             if (_choice is not null && value.Length > 0 && !Options(Property.Name).Contains(value, StringComparer.Ordinal))
                 throw new ArgumentException("Unknown " + Property.Name + " option.");
             _text = value; _sync = true;
@@ -57,7 +61,7 @@ public sealed partial class StyleValueEditor : UserControl
         "textAlignment" => [Inherit, "Left", "Center", "Right"],
         _ => []
     };
-    public StyleValueEditor(StyleProperty property)
+    public StyleValueEditor(StyleProperty property, bool showResetButton = true)
     {
         Property = property ?? throw new ArgumentNullException(nameof(property));
         _auxiliaryView = new(_auxiliary);
@@ -86,7 +90,7 @@ public sealed partial class StyleValueEditor : UserControl
         }
         _layout.Children.Add(InputElement);
         AutomationProperties.SetName(InputElement, property.Name);
-        ToolTipService.SetToolTip(InputElement, property.Hint + ". Blank / (inherit) removes this class property.");
+        ToolTipService.SetToolTip(InputElement, showResetButton ? property.Hint + ". Blank / (inherit) removes this class property." : property.Hint);
         if (property.Name is "foreground" or "background" or "borderColor")
         {
             _layout.ColumnDefinitions.Add(new() { Width = new GridLength(27) });
@@ -95,9 +99,9 @@ public sealed partial class StyleValueEditor : UserControl
             _swatch.HorizontalAlignment = HorizontalAlignment.Stretch;
             Grid.SetColumn(_swatch, 1); _layout.Children.Add(_swatch); Track("color", _swatch, "Choose " + property.Name + " color");
         }
-        _layout.ColumnDefinitions.Add(new() { Width = new GridLength(25) });
+        _layout.ColumnDefinitions.Add(new() { Width = new GridLength(showResetButton ? 25 : 0) });
         var reset = ControlTheme.Button("×", () => Text = ""); reset.Padding = new Thickness(1); reset.MinWidth = 0; reset.Width = 25;
-        reset.HorizontalAlignment = HorizontalAlignment.Stretch;
+        reset.HorizontalAlignment = HorizontalAlignment.Stretch; reset.Visibility = showResetButton ? Visibility.Visible : Visibility.Collapsed;
         Grid.SetColumn(reset, _layout.ColumnDefinitions.Count - 1); _layout.Children.Add(reset); Track("reset", reset, "Inherit " + property.Name);
         UpdateSwatch();
         Unloaded += (_, _) => _flyout?.Hide();
@@ -140,7 +144,7 @@ public sealed partial class StyleValueEditor : UserControl
         var use = ControlTheme.Button("Use color", () =>
         {
             if (!StyleColor.TryParse(_colorText.Text, out var color)) { _colorError.Text = "Enter #RRGGBB or #AARRGGBB."; return; }
-            Text = color.ToString(); _flyout!.Hide();
+            Text = color.ToString(); _flyout!.Hide(); ColorAccepted?.Invoke();
         });
         var cancel = ControlTheme.Button("Cancel", () => _flyout!.Hide());
         buttons.Children.Add(use); buttons.Children.Add(cancel); panel.Children.Add(buttons);

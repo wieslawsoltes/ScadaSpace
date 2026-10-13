@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from native_readiness import wait_command_bounds
+from native_readiness import wait_command_bounds, wait_component_sample
 
 OUT=Path('TestResults/browser-symbol-editors');OUT.mkdir(parents=True,exist_ok=True)
 BASE=os.environ.get('SCADASPACE_URL','http://127.0.0.1:8765/ScadaSpace/')
@@ -42,8 +42,9 @@ with sync_playwright() as p:
         page.mouse.click(b['x']+b['width']/2,b['y']+b['height']/2)
     def command(key):click(wait_command_bounds(page,key))
     def select(name):
-        page.wait_for_function('n=>window.scadaViews?.[0]?.components[n]?.bounds?.width>0 && window.scadaViews[0].components[n].bounds.height>0',arg=name,timeout=30000)
-        click(component(name)['bounds'])
+        sample=wait_component_sample(page,name)
+        logs.append({'kind':'component-input','name':name,**sample})
+        click(sample['bounds'])
         page.wait_for_function('n=>window.scadaApp.selection[0]===n && window.scadaApp.inspectorChoices && window.scadaApp.inspector.name?.width>0',arg=name,timeout=30000)
     def menu(key):
         page.wait_for_function('k=>window.scadaApp.inspector[k]?.width>0 && window.scadaApp.inspectorChoices[k]?.enabled',arg=key,timeout=30000)
@@ -103,6 +104,8 @@ with sync_playwright() as p:
         check('runtime preview retains edited graphics without modifying project settings',export('runtime.json')==baseline)
         command('preview');wait('!window.scadaApp.preview')
         page.set_viewport_size({'width':1024,'height':768});wait('window.scadaApp.viewport.width===1024');command('fit');select('Pump')
+        fitted=next(row for row in reversed(logs) if row['kind']=='component-input')
+        check('tablet selection uses current scaled native geometry',fitted['viewport']=={'width':1024,'height':768} and abs(fitted['bounds']['width']-170*fitted['zoom'])<1 and abs(fitted['bounds']['height']-230*fitted['zoom'])<1)
         choose('appearance','mimic');wait("window.scadaViews[0].components.Pump.symbol.options.appearance==='mimic'")
         check('native symbol choices stay usable in the tablet layout',symbol('Pump')['dataError'] is None and symbol('Pump')['renderError'] is None)
         page.screenshot(path=str(OUT/'symbol-editor-tablet.png'),full_page=True)

@@ -11,7 +11,7 @@ import sys
 import time
 from typing import Callable
 
-SUITES = ('smoke','parity','pages','trees','history','workspace','events','hierarchy','styles','symbols','symbol-states','led','symbol-editors')
+SUITES = ('smoke','parity','pages','trees','history','workspace','events','hierarchy','styles','symbols','symbol-states','led','symbol-editors','symbol-colors','inspector-search')
 OUT = Path('TestResults/browser-runs')
 
 def execute_suite(name: str) -> dict:

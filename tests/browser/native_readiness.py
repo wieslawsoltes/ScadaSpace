@@ -32,10 +32,68 @@ class CommandReadiness:
         if min(width, height, viewport_width, viewport_height) <= 0 or not (0 <= x + width / 2 < viewport_width and 0 <= y + height / 2 < viewport_height):
             self._geometry = None; self._count = 0
             return False
-        geometry = values + (sample.get('project'), sample.get('viewId'))
+        identity = self.identity(sample)
+        if identity is None:
+            self._geometry = None; self._count = 0
+            return False
+        geometry = values + identity
         self._count = self._count + 1 if geometry == self._geometry else 1
         self._geometry = geometry
         return self._count >= self.samples
+
+
+    def identity(self, sample: dict[str, Any]) -> tuple | None:
+        return (sample.get('project'), sample.get('viewId'))
+
+
+class ComponentReadiness(CommandReadiness):
+    """Unrotated pixel-layout designer selection, not arbitrary transformed hit testing."""
+    def identity(self, sample: dict[str, Any]) -> tuple | None:
+        layout, box, zoom = sample.get('layout'), sample['bounds'], sample.get('zoom')
+        if not isinstance(layout, dict) or not isinstance(layout.get('bounds'), dict):
+            return None
+        values = (zoom, layout.get('width'), layout.get('height'))
+        if any(not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) or v <= 0 for v in values):
+            return None
+        if sample.get('editing') is not True or sample.get('preview') is not False:
+            return None
+        if not layout.get('id') or not sample.get('viewId') or sample.get('view') != sample.get('observedView'):
+            return None
+        # Positive bounds alone can still belong to the pre-Fit layout. Require both
+        # independently observed native rectangles to agree with the declared size.
+        for key in ('width', 'height'):
+            if abs(box[key] - layout[key] * zoom) >= 1:
+                return None
+        for key in ('x', 'y', 'width', 'height'):
+            actual = layout['bounds'].get(key)
+            if not isinstance(actual, (int, float)) or isinstance(actual, bool) or not math.isfinite(actual) or abs(actual - box[key]) >= 1:
+                return None
+        return super().identity(sample) + (layout['id'], sample.get('generation'), zoom, layout['width'], layout['height'])
+
+
+def wait_component_sample(page: Any, name: str, timeout: int = 30000) -> dict[str, Any]:
+    """Wait for current scaled native geometry; the caller sends exactly one pointer input."""
+    deadline = time.monotonic() + timeout / 1000
+    tracker = ComponentReadiness()
+    sample = None
+    while time.monotonic() < deadline:
+        sample = page.evaluate("""name => {
+            const app = window.scadaApp, view = window.scadaViews?.[0];
+            return {
+                tick: app?.tick, project: app?.project, generation: app?.generation,
+                view: app?.view, observedView: view?.view, viewId: view?.id,
+                viewport: app?.viewport, zoom: app?.zoom, preview: app?.preview,
+                editing: view?.editing, layout: app?.components?.[name],
+                bounds: view?.components?.[name]?.bounds
+            };
+        }""", name)
+        if tracker.accept(sample):
+            return sample
+        remaining = max(1, int((deadline - time.monotonic()) * 1000))
+        page.wait_for_function('tick => Number.isInteger(window.scadaApp?.tick) && window.scadaApp.tick > tick',
+                               arg=sample.get('tick', -1) if isinstance(sample.get('tick'), int) else -1,
+                               timeout=remaining)
+    raise TimeoutError(f'Native component geometry did not settle: {name}; last observation: {sample}')
 
 
 def wait_command_bounds(page: Any, key: str, timeout: int = 30000) -> dict[str, float]:

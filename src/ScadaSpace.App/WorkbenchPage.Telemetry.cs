@@ -83,6 +83,15 @@ public sealed partial class WorkbenchPage
                 previewForeground = (_styleEditor.PreviewText.Foreground as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color.ToString(),
                 previewOpacity = _styleEditor.Preview.Opacity
             },
+            inspectorFilter = new
+            {
+                query = _inspector.FilterQuery, boundOnly = _inspector.FilterBoundOnly,
+                visible = _inspector.VisiblePropertyPaths, total = _inspector.PropertyCount,
+                noMatches = _inspector.FilterHasNoMatches, summary = _inspector.FilterSummary,
+                rowsCreated = _inspector.PropertyRowsCreated, builds = _inspector.FilterBuildCount, applies = _inspector.FilterApplyCount,
+                controls = _inspector.FilterCommands.ToDictionary(p => p.Key, p => Bounds(p.Value))
+            },
+            inspectorTyped = TypedInspectorTelemetry(Bounds),
             inspector = _inspector.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             inspectorChoices = _inspector.ChoiceEditors.ToDictionary(p => p.Key, p => new
             {
