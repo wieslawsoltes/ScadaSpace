@@ -1,21 +1,20 @@
 # LED validation review
 
-The first complete LED browser run passed all eleven pre-existing suites and its first five LED assertions. The next selector click observed the new component selection before the rebuilt Property Editor had native dimensions. The saved final observation has the correctly arranged number-format selector and no application errors. The fixture now waits for positive native selector dimensions and editability for that same selected component before clicking once. No fixed delay, retry, assertion removal or product command bypass is used.
+Native tests first exposed selection before the rebuilt inspector had arranged dimensions. The fixture now waits for the selected component's usable native bounds and editable format selector before one pointer action. No assertions or product input routes were bypassed.
 
-## Browser globalization data
+## Actual globalization defect and root cause
 
-The next run passed all eleven existing suites and the LED native editing, caching and German-locale assertions. Polish locale then revealed a product packaging defect: both actual displays held `locale: pl-PL` but formatted the number with English punctuation. This was not a failed binding or an unfinished drawing; both controls had successfully rendered the wrong cultural format with no diagnostic. The WebAssembly default startup-culture ICU subset did not contain Polish data.
+Both numeric LED controls correctly received `pl-PL`, completed rendering, and still displayed English punctuation. German formatting worked. The downloaded loader selected `globalizationMode: sharded`, using partial ICU files.
 
-The browser target now sets the .NET WebAssembly SDK's `WasmIncludeFullIcuData` property. This makes dynamic locale selection use the included full ICU data rather than silently falling back to the startup subset. Desktop builds remain unchanged. It increases the initial globalization payload in exchange for the advertised dynamic-locale functionality; no locale-specific string replacement or relaxed browser assertion is used. Reusable library hosts likewise need appropriate globalization data.
+The first two attempts set `WasmIncludeFullIcuData` conditionally and then unconditionally. Neither fixed the package: the evaluated flag was already true while the published mode remained sharded. The earlier explanation that framework conditions or nested publish evaluation were responsible was not supported by the resulting artifact.
 
-Primary build-property reference: https://github.com/dotnet/runtime/blob/release/10.0/src/mono/wasm/build/WasmApp.Common.targets
+The .NET 10 browser SDK's own `IcuTests.FullIcuFromRuntimePackWithInvariant` uses **BlazorWebAssemblyLoadAllGlobalizationData**, even for `Template.WasmBrowser`. Its comment links runtime issue #94133 about the incomplete build-property rename. ScadaSpace now sets that consumed property instead of the ineffective Wasm-named switch. This is build configuration, not locale-specific replacement of formatted strings.
 
-## Published-manifest verification
+The existing post-publication gate still requires mode `all`, one full `icudt.dat` entry, and actual file bytes matching the manifest SHA-256. Its six contract tests remain. Native US/German/Polish rendering assertions remain required. Full locale data increases download size; the report records uncompressed and available compressed bytes. Reusable browser hosts must also provide suitable ICU data.
 
-The first ICU property change did not alter the published loader: the downloaded 9d00d66 application still declared `globalizationMode: sharded` and listed the three partial ICU files. The browser correctly repeated the Polish-format failure. Setting an MSBuild property was therefore not sufficient evidence that the intended data was deployed.
+## References
 
-The SDK switch now lives in the unconditional project property group, so Uno's target-framework normalization and nested publish evaluation cannot exclude it through the previous browserwasm condition. It is consumed only by the WebAssembly SDK; it does not change desktop globalization. The workflow records evaluated framework/globalization properties and runs a new post-publication gate that parses the actual embedded boot JSON, requires mode `all`, requires the full `icudt.dat` resource, and checks the deployed bytes against its SHA-256 metadata. A wrong mode or missing/mismatched asset fails before the interaction suites. Six dependency-free contracts exercise the gate, including rejection of the previous sharded configuration. The native Polish assertion is still required.
+- https://github.com/dotnet/runtime/blob/release/10.0/src/mono/wasm/Wasm.Build.Tests/IcuTests.cs
+- https://github.com/dotnet/runtime/issues/94133
 
-The stacked symbol-editor run also found an earlier LED selection reading a newly recreated component before it had native bounds after Undo. The LED fixture now waits for positive component bounds before each selection or field input, in addition to waiting for its inspector fields. All existing assertions remain; this does not retry a pointer action or change the renderer.
-
-Full-ICU configuration reference: https://github.com/dotnet/runtime/blob/release/10.0/docs/design/features/globalization-icu-wasm.md
+Success is established only by the matching published manifest and executed browser assertions, not by a project property or desktop compilation.
