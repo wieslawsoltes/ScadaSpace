@@ -24,22 +24,23 @@ public partial class PropertyInspector : Grid
     public event Action<string>? Error;
     public PropertyInspector()
     {
-        RowDefinitions.Add(new() { Height = new GridLength(33) }); RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
+        RowDefinitions.Add(new() { Height = new GridLength(33) }); RowDefinitions.Add(new() { Height = GridLength.Auto }); RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
         var title = new Border { Child = _heading, Padding = new Thickness(8, 0, 5, 0), Background = ControlTheme.Brush("#E7ECEF") }; Children.Add(title);
+        var filter = BuildFilterBar(); Grid.SetRow(filter, 1); Children.Add(filter);
         var scroll = new ScrollViewer { Content = _fields, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        Grid.SetRow(scroll, 1); Children.Add(scroll); _message.Margin = new Thickness(6); _message.TextWrapping = TextWrapping.Wrap; Grid.SetRow(_message, 2); Children.Add(_message);
+        Grid.SetRow(scroll, 2); Children.Add(scroll); _message.Margin = new Thickness(6); _message.TextWrapping = TextWrapping.Wrap; Grid.SetRow(_message, 3); Children.Add(_message);
     }
     public void Inspect(DesignerDocument document, string? id, ViewHost host)
     {
-        _inspectionVersion++;
+        _inspectionVersion++; ResetFilterRows();
         _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _choices.Clear(); _colorEditors.Clear(); _switchEditors.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
         var node = id is null ? null : document.Find(id);
-        if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); return; }
+        if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); FinishFilterRows(false); return; }
         _heading.Text = node.Name + "  ·  " + node.Type;
         Section("META");
         Field("name", node.Name, text => Edit("Rename component", n => n.Name = text));
         var locked = new CheckBox { Content = "Lock position", IsChecked = node.Locked, FontSize = 11, MinHeight = 29, Margin = new Thickness(6, 0, 0, 0) };
-        locked.Checked += (_, _) => Edit("Lock component", n => n.Locked = true); locked.Unchecked += (_, _) => Edit("Unlock component", n => n.Locked = false); _fields.Children.Add(locked);
+        locked.Checked += (_, _) => Edit("Lock component", n => n.Locked = true); locked.Unchecked += (_, _) => Edit("Unlock component", n => n.Locked = false); AddFilterRow(locked, "locked");
         Section("PROPS");
         foreach (var pair in node.Props.OrderBy(x => x.Key, StringComparer.Ordinal))
         {
@@ -48,7 +49,7 @@ public partial class PropertyInspector : Grid
             var box = Field(property, value.ToString(), text => Edit("Set " + property, n => n.Props[property] = Scalar.Parse(text, value.Kind)), async () => await EditBindingAsync(property), bound);
             if (bound) _live.Add(() => { var current = _document?.Find(_id!); if (current is not null) { var sample = _host!.Read(current, property); box.Text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString(); } });
         }
-        var add = ControlTheme.Button("+ Add custom property", async () => await AddPropertyAsync(false)); add.Margin = new Thickness(5); _fields.Children.Add(add);
+        var add = ControlTheme.Button("+ Add custom property", async () => await AddPropertyAsync(false)); add.Margin = new Thickness(5); AddFilterRow(add, "Add property", property: false);
         Section("POSITION");
         Field("x", node.X.ToString(CultureInfo.InvariantCulture), text => Edit("Set X", n => n.X = Parse(text)));
         Field("y", node.Y.ToString(CultureInfo.InvariantCulture), text => Edit("Set Y", n => n.Y = Parse(text)));
@@ -58,19 +59,19 @@ public partial class PropertyInspector : Grid
         if (node.Type == "Container")
         {
             var layout = new ComboBox { ItemsSource = Enum.GetValues<LayoutKind>(), SelectedItem = node.Layout, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(6), MinHeight = 30 };
-            layout.SelectionChanged += (_, _) => { if (layout.SelectedItem is LayoutKind selected) Edit("Change layout", n => n.Layout = selected); }; _fields.Children.Add(layout);
+            layout.SelectionChanged += (_, _) => { if (layout.SelectedItem is LayoutKind selected) Edit("Change layout", n => n.Layout = selected); }; AddFilterRow(layout, "layout");
         }
         Section("STYLE");
         Field("classes", string.Join(", ", node.StyleClasses), text => Edit("Set style classes", n => n.StyleClasses = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToList()));
         foreach (var pair in node.Style.OrderBy(p => p.Key)) { var key = pair.Key; var value = pair.Value; Field(key, value.ToString(), text => Edit("Set style", n => n.Style[key] = Scalar.Parse(text, value.Kind))); }
-        _fields.Children.Add(ControlTheme.Button("Edit style JSON…", async () => await EditJsonAsync("Style", JsonSerializer.Serialize(node.Style, ProjectCodec.Options), text => Edit("Edit style", n => n.Style = JsonSerializer.Deserialize<Dictionary<string, Scalar>>(text, ProjectCodec.Options) ?? throw new FormatException("Style cannot be null.")))));
+        AddFilterRow(ControlTheme.Button("Edit style JSON…", async () => await EditJsonAsync("Style", JsonSerializer.Serialize(node.Style, ProjectCodec.Options), text => Edit("Edit style", n => n.Style = JsonSerializer.Deserialize<Dictionary<string, Scalar>>(text, ProjectCodec.Options) ?? throw new FormatException("Style cannot be null.")))), "Edit style JSON", property: false);
         Section("CUSTOM");
         foreach (var pair in node.Custom.OrderBy(p => p.Key)) { var key = pair.Key; var value = pair.Value; Field(key, value.ToString(), text => Edit("Set custom property", n => n.Custom[key] = Scalar.Parse(text, value.Kind))); }
-        _fields.Children.Add(ControlTheme.Button("+ Add to custom", async () => await AddPropertyAsync(true)));
+        AddFilterRow(ControlTheme.Button("+ Add to custom", async () => await AddPropertyAsync(true)), "Add property", property: false);
         Section("EVENTS");
-        foreach (var pair in node.Events) _fields.Children.Add(ControlTheme.Text("  " + pair.Key + "  ·  " + pair.Value.Count + " actions", 11));
+        foreach (var pair in node.Events) AddFilterRow(ControlTheme.Text("  " + pair.Key + "  ·  " + pair.Value.Count + " actions", 11), pair.Key, property: false);
         BuildEventCommand(node);
-        RefreshValues();
+        RefreshValues(); FinishFilterRows(true);
     }
     public void RefreshValues() { foreach (var update in _live) update(); }
     private static double Parse(string text)
@@ -82,7 +83,8 @@ public partial class PropertyInspector : Grid
     private void Section(string name)
     {
         var border = new Border { Background = ControlTheme.Brush("#E8ECEF"), Padding = new Thickness(7, 5, 5, 5), Margin = new Thickness(0, 5, 0, 0), Child = ControlTheme.Text("▾  " + name, 10, "#526671") };
-        _fields.Children.Add(border);
+        _fields.Children.Add(border); _filterSectionName = name.ToLowerInvariant();
+        _filterSection = new FilterSection(border); _filterSections.Add(_filterSection);
     }
     private TextBox Field(string name, string text, Action<string> commit, Action? binding = null, bool bound = false)
     {
@@ -102,7 +104,7 @@ public partial class PropertyInspector : Grid
         box.LostFocus += (_, _) => Apply(); box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Apply(); e.Handled = true; } };
         Grid.SetColumn(box, 1); row.Children.Add(box);
         if (binding is not null) { var button = ControlTheme.Button(bound ? "●" : "○", binding); button.Foreground = ControlTheme.Brush(bound ? "#138EB6" : "#8396A2"); button.Padding = new Thickness(2); button.BorderThickness = new Thickness(0); Grid.SetColumn(button, 2); row.Children.Add(button); }
-        _fields.Children.Add(row); return box;
+        AddFilterRow(row, name, bound); return box;
     }
     private void Edit(string label, Action<ComponentNode> action)
     {

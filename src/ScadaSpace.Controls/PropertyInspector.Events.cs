@@ -24,7 +24,7 @@ public partial class PropertyInspector
         button.FontSize = 11;
         AutomationProperties.SetName(button, "Configure events on " + node.Name);
         ToolTipService.SetToolTip(button, "Configure ordered local actions; Apply and Cancel do not execute actions.");
-        EventConfigurationButton = button; _fields.Children.Add(button);
+        EventConfigurationButton = button; AddFilterRow(button, "Configure Events", property: false);
     }
 
     private async Task ShowEventConfigurationAsync(string id)

@@ -46,6 +46,6 @@ public partial class PropertyInspector
         Grid.SetColumn(choice, 1); row.Children.Add(choice);
         var binding = ControlTheme.Button(bound ? "●" : "○", async () => await EditBindingAsync(property));
         binding.Foreground = ControlTheme.Brush(bound ? "#138EB6" : "#8396A2"); binding.Padding = new Thickness(2); binding.BorderThickness = new Thickness(0);
-        Grid.SetColumn(binding, 2); row.Children.Add(binding); _fields.Children.Add(row); return true;
+        Grid.SetColumn(binding, 2); row.Children.Add(binding); AddFilterRow(row, property, bound); return true;
     }
 }
