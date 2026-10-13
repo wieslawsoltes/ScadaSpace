@@ -26,7 +26,6 @@ public partial class PropertyInspector
     private readonly Dictionary<string, FrameworkElement> _filterCommands = new(StringComparer.Ordinal);
     private ReadOnlyDictionary<string, FrameworkElement>? _filterCommandView;
     private IReadOnlyList<string> _visiblePropertyPaths = Array.Empty<string>();
-    private Grid? _filterBar;
     private bool _filterSync;
     public IReadOnlyDictionary<string, FrameworkElement> FilterCommands => _filterCommandView ??= new(_filterCommands);
     public IReadOnlyList<string> VisiblePropertyPaths => _visiblePropertyPaths;
@@ -59,7 +58,7 @@ public partial class PropertyInspector
         _filterSearch.TextChanged += (_, _) => ChangePropertyFilter();
         _filterSearch.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Escape) { ClearPropertyFilter(); e.Handled = true; } };
         _filterBound.Checked += (_, _) => ChangePropertyFilter(); _filterBound.Unchecked += (_, _) => ChangePropertyFilter();
-        return _filterBar = bar;
+        return bar;
     }
 
     private void ChangePropertyFilter()
@@ -87,7 +86,7 @@ public partial class PropertyInspector
     private void FinishFilterRows(bool selected)
     {
         FilterBuildCount++;
-        if (_filterBar is not null) _filterBar.IsEnabled = selected;
+        foreach (var control in _filterCommands.Values.OfType<Control>()) control.IsEnabled = selected;
         if (selected) _fields.Children.Add(_filterEmpty);
         ApplyPropertyFilter();
     }
