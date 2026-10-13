@@ -19,6 +19,8 @@ var original=cache.Read(read);Check(ReferenceEquals(original,cache.Read(read)),"
 input=Scalar.From(25);Check(cache.Read(read).Text=="25.0"&&original.Text=="12.3","packaged presentation updates do not mutate older snapshots");
 Check(snapshot.WithNumericValue(100).Text=="100,00","packaged numeric property updates reformat the snapshot");
 var component=ComponentCatalog.Create("LEDDisplay");Check(component.Text("segmentFormat")=="14 segment","packaged catalog exposes the new display default");
+Check(SymbolEditorOptions.Choices("Pump","variant").SequenceEqual(new[]{"centrifugal","vacuum"}),"packaged symbol metadata offers the supported variants");
+Check(SymbolEditorOptions.Choices("Valve","state").Contains("partiallyClosed")&&!SymbolEditorOptions.Choices("Valve","state").Contains("running"),"packaged state metadata respects symbol families");
 '''
 logs=[]
 try:
@@ -29,7 +31,7 @@ try:
             logs.append(run.stdout+run.stderr);print(logs[-1],end='',flush=True)
             if run.returncode:raise RuntimeError('LED package consumer failed')
         count=sum(line.startswith('PASS ') for line in logs[-1].splitlines())
-        if count!=6:raise RuntimeError('Expected six executed LED package checks')
+        if count!=8:raise RuntimeError('Expected eight executed display and symbol package checks')
         assets=json.loads((root/'obj/project.assets.json').read_text())
         if any(value['type']=='project' for value in assets['libraries'].values()):raise RuntimeError('Unexpected project reference')
         (out/'results.json').write_text(json.dumps({'tests':count,'failures':0,'libraries':sorted(assets['libraries'])},indent=2))

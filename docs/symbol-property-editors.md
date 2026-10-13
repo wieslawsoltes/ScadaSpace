@@ -1,0 +1,16 @@
+# Native symbol property choices
+
+The existing flat Property Editor now uses native ComboBox controls for supported industrial-symbol choices: appearance, machine/vessel direction, pump variant and mounting feet, and project-defined state. Newly inserted pumps expose variant and mounting feet directly; older project definitions retain their existing implicit renderer defaults without migration. Pipe routing uses the two implemented route presets. LED mode and number-format dropdowns retain their existing behavior. Free-form text, numeric values, locale, color strings and unrelated controls are not changed by this feature; there is no new nested-property-tree editor.
+
+The independent `SymbolEditorOptions` Core API provides read-only choices to any UI. Fixed vocabularies are shared immutable lists, and including an already known current value returns the same list without allocating. State lists are owned snapshots built from the current immutable project catalog when the inspector is rebuilt, not on every runtime refresh. Only states assigned to the selected family are offered. Imported custom format strings and invalid current state values are preserved as selected options instead of silently changing the underlying project. Unknown or unapplied states continue to show the renderer's existing diagnostic until corrected.
+
+Choosing an option performs the normal validated designer transaction, with unchanged revision/selection guards and undo/redo. Qualified `props.*` bindings remain disabled for direct editing and show their current evaluated values. Binding keys are preserved by the existing binding editor. Long property names have a tooltip in the compact label column. This implements authoring for the existing renderer capabilities; it does not add unsupported drawing modes or rewrite project defaults on selection.
+
+Engine tests validate the vocabularies, state-family filtering, immutable ownership, free-form fallbacks, and allocation-free fixed-list lookup. The additional browser suite uses actual native selection/menu input for all five industrial families, custom states, unknown-state correction, qualified bindings, routing, undo/redo, complete export equality and tablet layout. It retains the earlier suites unchanged. Assertions are evidence only when the matching Actions revision passes; a source definition or compile is not an executed interaction.
+
+Public feature references:
+- Pump options: https://www.docs.inductiveautomation.com/docs/8.3/appendix/components/perspective-components/perspective-symbols-palette/perspective-pump
+- Valve states: https://www.docs.inductiveautomation.com/docs/8.3/appendix/components/perspective-components/perspective-symbols-palette/perspective-valve
+- Vessel direction: https://www.docs.inductiveautomation.com/docs/8.3/appendix/components/perspective-components/perspective-symbols-palette/perspective-vessel
+
+The implementation and artwork are independent. Complete Perspective designer/CSS/component parity, original artwork matching, Gateway services and platform runtime qualification remain separate. Browser CI uses SwiftShader rather than physical-GPU qualification. Excluded chart-renderer, configurable-popup and nested-property-inspector work is unchanged.
