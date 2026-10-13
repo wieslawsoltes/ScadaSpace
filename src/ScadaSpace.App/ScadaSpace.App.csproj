@@ -11,8 +11,9 @@
     <IsUiAutomationMappingEnabled>true</IsUiAutomationMappingEnabled>
     <WasmShellWebAppBasePath>/ScadaSpace/</WasmShellWebAppBasePath>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
-    <!-- Consumed only by the browser SDK; keep unconditional across Uno's nested TFM evaluation. -->
-    <WasmIncludeFullIcuData>true</WasmIncludeFullIcuData>
+    <!-- .NET 10 browser SDK still consumes the Blazor-prefixed switch (runtime#94133).
+         Verify the generated boot manifest and ICU hash in CI, not only this intent. -->
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ScadaSpace.Controls/ScadaSpace.Controls.csproj" />
