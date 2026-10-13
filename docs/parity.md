@@ -28,7 +28,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 ## Verification scope
 
-Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Fifteen browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration, hierarchy editing, style authoring, industrial symbols, project symbol states, LED displays, native symbol property choices, typed symbol materials and retained flat property search. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
+Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Sixteen browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration, hierarchy editing, style authoring, industrial symbols, project symbol states, LED displays, native symbol property choices, typed symbol materials, retained flat property search, and search modes/category folding. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
 
 Counts and pass/fail claims apply only to the exact revision in the corresponding Actions artifacts. Build success alone is not runtime evidence. See [validation](validation.md), [configuration workflows](configuration-workflows.md), and the retained source, reports and screenshots for executed scope.
 
@@ -57,4 +57,4 @@ See [LED displays](led-displays.md) for the seven/fourteen-segment modes, native
 
 See [native symbol property editors](symbol-property-editors.md) for family-aware dropdowns, project state filtering, qualified bindings and invalid-state repair.
 
-See [flat property search](property-inspector-search.md) for qualified-name and bound-only filtering, retained native editors, and explicit search-mode limitations.
+See [flat property search](property-inspector-search.md) for native syntax/boundary/case options, qualified-name and bound-only filtering, retained collapsible categories, and explicit regex-subset limitations.

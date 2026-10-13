@@ -85,6 +85,13 @@ var propertyFilter = new PropertyFilter(); propertyFilter.Set("props.color", tru
 Check(propertyFilter.Matches("props.color", true) && !propertyFilter.Matches("props.color"), "packaged property search combines names and configured bindings");
 var filterRevision = propertyFilter.Revision;
 Check(!propertyFilter.Set(" PROPS.COLOR ", true) && propertyFilter.Revision == filterRevision, "packaged equivalent property search retains its revision");
+propertyFilter.Set("diode*Color", false, PropertySearchSyntax.Wildcard, PropertySearchMatch.Exact, false);
+Check(propertyFilter.Matches("props.diodeOnColor", "diodeOnColor") && !propertyFilter.Matches("props.diodeColorRecipe", "diodeColorRecipe"), "packaged wildcard name matching supports exact boundaries");
+propertyFilter.Set("^diode(On|Off)Color$", false, PropertySearchSyntax.RegularExpression, PropertySearchMatch.Anywhere, true);
+Check(propertyFilter.Error.Length == 0 && propertyFilter.Matches("props.diodeOffColor", "diodeOffColor"), "packaged bounded regular expressions execute without an app reference");
+propertyFilter.Set("[", false, PropertySearchSyntax.RegularExpression, PropertySearchMatch.Anywhere, false);
+Check(propertyFilter.Error.Length > 0 && !propertyFilter.Matches("props.color"), "packaged invalid regex queries fail closed");
+
 
 '''
 logs = []
@@ -104,8 +111,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 20:
-            raise RuntimeError(f"Expected twenty executed package checks; got {count}")
+        if count != 23:
+            raise RuntimeError(f"Expected twenty-three executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):
