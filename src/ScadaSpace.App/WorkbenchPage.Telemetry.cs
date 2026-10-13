@@ -84,6 +84,12 @@ public sealed partial class WorkbenchPage
                 previewOpacity = _styleEditor.Preview.Opacity
             },
             inspector = _inspector.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
+            inspectorChoices = _inspector.ChoiceEditors.ToDictionary(p => p.Key, p => new
+            {
+                enabled = p.Value.IsEnabled, selected = p.Value.SelectedItem as string,
+                options = p.Value.IsDropDownOpen ? ((IEnumerable<string>)p.Value.ItemsSource).Select((name, index) => new
+                { name, bounds = p.Value.ContainerFromIndex(index) is FrameworkElement item ? Bounds(item) : null }).ToArray() : null
+            }),
             hierarchy = new { builds = _document.HierarchyBuildCount, layoutBuilds = _surface.LayoutBuildCount, sourceError = _sourceViewError, restoreErrors = _document.RestoreDiagnostics },
             symbolLibrary = SymbolLibraryTelemetry(Bounds),
             symbolDefaults = _session.Symbols,

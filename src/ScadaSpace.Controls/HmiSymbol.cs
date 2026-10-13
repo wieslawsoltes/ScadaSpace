@@ -39,6 +39,7 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
     public long PictureBuildCount => _cache.PictureBuildCount;
     public int RetainedPictureCount => _cache.RetainedPictureCount;
     public bool LastAlternateFill { get; private set; }
+    public LedDisplaySnapshot? LedDisplay => _snapshot?.Led ?? Data.Led;
     public long RenderCount => _cache.DrawCount;
     public long AnimationInvalidations { get; private set; }
     public bool Animating => !_disposed && AllowAnimation && IsLoaded && DataError is null && Quality == Quality.Good && Data.Options?.NeedsAnimation == true && IndustrialSymbolRenderer.Supports(Kind);
@@ -107,6 +108,8 @@ public partial class HmiSymbol : SKCanvasElement, IDisposable
                 Value = Value, Minimum = Minimum, Maximum = Maximum, Unit = Unit, Color = SymbolColor, Quality = Quality,
                 Options = !AllowAnimation && Data.Options is { } options ? options with { AnimationSpeed = 0 } : Data.Options
             };
+            if (_snapshot.Led is { NumericValue: not null } led && led.NumericValue != Value)
+                _snapshot = _snapshot with { Led = led.WithNumericValue(Value) };
             var elapsed = AllowAnimation ? SymbolAnimation.ElapsedSeconds : 0;
             _cache.Draw(canvas, bounds, Kind, _snapshot, elapsed);
             LastAlternateFill = Quality == Quality.Good && _snapshot.Options?.AlternateFill(elapsed) == true;

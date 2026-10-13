@@ -32,7 +32,7 @@ public partial class PropertyInspector : Grid
     public void Inspect(DesignerDocument document, string? id, ViewHost host)
     {
         _inspectionVersion++;
-        _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
+        _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _choices.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
         var node = id is null ? null : document.Find(id);
         if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); return; }
         _heading.Text = node.Name + "  ·  " + node.Type;
@@ -43,7 +43,8 @@ public partial class PropertyInspector : Grid
         Section("PROPS");
         foreach (var pair in node.Props.OrderBy(x => x.Key, StringComparer.Ordinal))
         {
-            var property = pair.Key; var value = pair.Value; var bound = node.Bindings.ContainsKey(property);
+            var property = pair.Key; var value = pair.Value; var bound = node.Bindings.ContainsKey(property) || node.Bindings.ContainsKey("props." + property);
+            if (TryBuildLedChoice(node, property, value, bound)) continue;
             var box = Field(property, value.ToString(), text => Edit("Set " + property, n => n.Props[property] = Scalar.Parse(text, value.Kind)), async () => await EditBindingAsync(property), bound);
             if (bound) _live.Add(() => { var current = _document?.Find(_id!); if (current is not null) { var sample = _host!.Read(current, property); box.Text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString(); } });
         }
@@ -130,7 +131,8 @@ public partial class PropertyInspector : Grid
     public async Task EditBindingAsync(string property)
     {
         var node = _id is null ? null : _document?.Find(_id); if (node is null) return;
-        node.Bindings.TryGetValue(property, out var old);
+        var bindingKey = node.Bindings.ContainsKey(property) ? property : node.Bindings.ContainsKey("props." + property) ? "props." + property : property;
+        node.Bindings.TryGetValue(bindingKey, out var old);
         var kind = new ComboBox { Header = "Binding type", ItemsSource = Enum.GetValues<BindingKind>(), SelectedItem = old?.Kind ?? BindingKind.Tag, MinWidth = 420 };
         var source = new TextBox { Header = "Tag path / property path / expression", Text = old?.Source ?? "[default]Plant/Tank01/Level", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 78 };
         var enabled = new CheckBox { Content = "Enable binding", IsChecked = old?.Enabled ?? true };
@@ -146,11 +148,11 @@ public partial class PropertyInspector : Grid
                 var binding = new BindingDefinition { Kind = (BindingKind)kind.SelectedItem, Source = source.Text, Enabled = enabled.IsChecked == true, Bidirectional = bidirectional.IsChecked == true, Transforms = JsonSerializer.Deserialize<List<TransformDefinition>>(transforms.Text, ProjectCodec.Options) ?? throw new FormatException("Transform chain must be an array.") };
                 if (binding.Kind == BindingKind.Expression) new ExpressionEngine().Compile(binding.Source);
                 foreach (var transform in binding.Transforms.Where(t => t.Kind == TransformKind.Expression)) new ExpressionEngine().Compile(transform.Expression);
-                Edit("Configure binding", n => n.Bindings[property] = binding);
+                Edit("Configure binding", n => n.Bindings[bindingKey] = binding);
             }
             catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException or JsonException) { args.Cancel = true; error.Text = ex.Message; }
         };
-        dialog.SecondaryButtonClick += (_, _) => Edit("Remove binding", n => n.Bindings.Remove(property));
+        dialog.SecondaryButtonClick += (_, _) => Edit("Remove binding", n => n.Bindings.Remove(bindingKey));
         await dialog.ShowAsync();
     }
     public async Task EditJsonAsync(string title, string json, Action<string> commit, string? description = null)

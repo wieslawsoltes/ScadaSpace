@@ -11,7 +11,7 @@ internal static partial class BrowserServices
     {
         id = SymbolIdentities.GetValue(symbol, static _ => new()).Id,
         kind = symbol.Kind, value = symbol.Value, minimum = symbol.Minimum, maximum = symbol.Maximum,
-        quality = symbol.Quality, options = symbol.Data.Options, tank = symbol.Data.Tank,
+        quality = symbol.Quality, options = symbol.Data.Options, tank = symbol.Data.Tank, led = symbol.LedDisplay,
         dataError = symbol.DataError, renderError = symbol.RenderError,
         pictures = symbol.PictureBuildCount, retainedPictures = symbol.RetainedPictureCount,
         alternateFill = symbol.LastAlternateFill, renders = symbol.RenderCount,

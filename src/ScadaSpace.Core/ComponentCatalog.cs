@@ -11,7 +11,7 @@ public static class ComponentCatalog
     public static IReadOnlyList<ComponentDescriptor> All { get; } = new ComponentDescriptor[]
     {
         new("Label", "Label", "Display", 160, 36, Props(("text", S("Label")), ("fontSize", N(16)), ("foreground", S("#273641")))),
-        new("LEDDisplay", "LED Display", "Display", 170, 70, Props(("value", N(42.6)), ("unit", S("")), ("format", S("0.0")))),
+        new("LEDDisplay", "LED Display", "Display", 210, 70, Props(("value", N(42.6)), ("unit", S("")), ("segmentFormat", S("14 segment")), ("numberFormat", S("#,##0.00")), ("locale", S("en-US")), ("backgroundColor", S("#161616")), ("diodeOnColor", S("#1EC963")), ("diodeOffColor", S("#193B29")))),
         new("Tank", "Cylindrical Tank", "Display", 190, 235, Props(("value", N(60)), ("minimum", N(0)), ("maximum", N(100)), ("unit", S("%")), ("color", S("#48AFC0")), ("warning", N(85)))),
         new("Thermometer", "Thermometer", "Display", 95, 210, Props(("value", N(45)), ("minimum", N(0)), ("maximum", N(100)), ("unit", S("°C")), ("color", S("#E66C62")))),
         new("Progress", "Progress", "Display", 200, 24, Props(("value", N(65)), ("minimum", N(0)), ("maximum", N(100)))),
