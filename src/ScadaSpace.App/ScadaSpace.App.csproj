@@ -11,9 +11,7 @@
     <IsUiAutomationMappingEnabled>true</IsUiAutomationMappingEnabled>
     <WasmShellWebAppBasePath>/ScadaSpace/</WasmShellWebAppBasePath>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
-  </PropertyGroup>
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'browserwasm'">
-    <!-- LED locale is dynamic; startup-culture ICU shards silently fall back for other locales. -->
+    <!-- Consumed only by the browser SDK; keep unconditional across Uno's nested TFM evaluation. -->
     <WasmIncludeFullIcuData>true</WasmIncludeFullIcuData>
   </PropertyGroup>
   <ItemGroup>
