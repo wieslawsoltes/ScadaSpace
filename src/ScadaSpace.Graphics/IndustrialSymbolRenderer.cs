@@ -8,7 +8,7 @@ public readonly record struct SymbolArrangement(SKRect Body, SKRect Label, SKRec
 /// <summary>Independent normalized vector artwork with upright annotations and resolved theme materials.</summary>
 public static partial class IndustrialSymbolRenderer
 {
-    private static readonly SKColor Outline = SKColor.Parse("#606060"), Shell = SKColor.Parse("#F4F4F4"), Metal = SKColor.Parse("#BEBEBE");
+    private static readonly SKColor Outline = SKColor.Parse("#606060"), Shell = SKColor.Parse("#F4F4F4");
     public static bool Supports(SymbolKind kind) => kind is SymbolKind.Pump or SymbolKind.Motor or SymbolKind.Valve or SymbolKind.Sensor or SymbolKind.Vessel;
     public static SKColor Color(string text) { var c = StyleColor.Parse(text); return new(c.Red, c.Green, c.Blue, c.Alpha); }
     public static SymbolArrangement Arrange(SKRect bounds, SymbolOptions options)
@@ -89,7 +89,7 @@ public static partial class IndustrialSymbolRenderer
     }
     private static void Shape(CanvasPainter p, SKPath path, SKColor color, bool mimic)
     {
-        var surface = Surface(p); p.Path(path, p.SymbolStyle is not null ? surface : mimic ? Metal : Shell);
+        var surface = Surface(p);
         if (mimic)
         {
             var save = p.Canvas.Save();
@@ -105,6 +105,7 @@ public static partial class IndustrialSymbolRenderer
             }
             finally { p.Canvas.RestoreToCount(save); }
         }
+        else p.Path(path, surface);
         p.Path(path, color, true, 1.8f);
     }
     private static void Box(CanvasPainter p, SKRect rect, SKColor color, float radius = 0, bool mimic = false)

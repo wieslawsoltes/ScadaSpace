@@ -3,7 +3,7 @@ using SkiaSharp;
 namespace ScadaSpace.Graphics;
 
 /// <summary>Frame-local paints are reused across primitives and deterministically disposed.</summary>
-public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
+public sealed partial class CanvasPainter(SKCanvas canvas) : IDisposable
 {
     /// <summary>Application-owned typeface; retain until rendering stops.</summary>
     public static SKTypeface? DrawingTypeface { get; set; }
@@ -38,7 +38,10 @@ public sealed class CanvasPainter(SKCanvas canvas) : IDisposable
     public void Gradient(SKRect rect, SKColor left, SKColor center, SKColor right)
     {
         using var shader = SKShader.CreateLinearGradient(new(rect.Left, 0), new(rect.Right, 0), [left, center, right], [0f, .45f, 1f], SKShaderTileMode.Clamp);
-        var paint = Paint(left); paint.Shader = shader; Canvas.DrawRect(rect, paint); paint.Shader = null;
+        // Shader stops already contain alpha; the paint must not multiply it again.
+        var paint = Paint(SKColors.White); paint.Shader = shader;
+        try { Canvas.DrawRect(rect, paint); }
+        finally { paint.Shader = null; }
     }
     public void Dispose() { _curve.Dispose(); _font.Dispose(); _paint.Dispose(); }
 }

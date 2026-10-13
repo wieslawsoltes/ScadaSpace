@@ -13,7 +13,6 @@ public static partial class SymbolRenderer
         var shell = IndustrialSymbolRenderer.Color(warning ? o.TankWarningColor : o.TankColor);
         var liquid = warning ? IndustrialSymbolRenderer.Color(o.LiquidWarningColor) : color;
         var right = o.ShowScale ? 160f : 178f;
-        var body = SKRect.Create(22, 26, right - 22, 179);
         using var silhouette = new SKPath();
         silhouette.MoveTo(22, 26); silhouette.CubicTo(22, 10, right, 10, right, 26);
         silhouette.LineTo(right, 197); silhouette.CubicTo(right, 215, 22, 215, 22, 197); silhouette.Close();
@@ -25,10 +24,7 @@ public static partial class SymbolRenderer
             if (fraction > 0 && o.LiquidOpacity > 0 && data.Quality == Quality.Good)
             {
                 var y = 205 - fraction * 181;
-                var fill = liquid.WithAlpha((byte)Math.Round(liquid.Alpha * o.LiquidOpacity));
-                p.Rect(SKRect.Create(22, y, right - 22, 215 - y), fill);
-                p.Ellipse(SKRect.Create(22, y - 8, right - 22, 16), fill);
-                p.Arc(SKRect.Create(22, y - 8, right - 22, 16), 0, 180, liquid, .8f);
+                p.LiquidColumn(SKRect.Create(22, y, right - 22, 215 - y), 8, liquid, o.LiquidOpacity);
             }
         }
         finally { p.Canvas.RestoreToCount(save); }
