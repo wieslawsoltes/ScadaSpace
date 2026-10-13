@@ -32,7 +32,7 @@ public partial class PropertyInspector : Grid
     public void Inspect(DesignerDocument document, string? id, ViewHost host)
     {
         _inspectionVersion++;
-        _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _choices.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
+        _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _choices.Clear(); _colorEditors.Clear(); _switchEditors.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
         var node = id is null ? null : document.Find(id);
         if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); return; }
         _heading.Text = node.Name + "  ·  " + node.Type;
@@ -44,7 +44,7 @@ public partial class PropertyInspector : Grid
         foreach (var pair in node.Props.OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             var property = pair.Key; var value = pair.Value; var bound = node.Bindings.ContainsKey(property) || node.Bindings.ContainsKey("props." + property);
-            if (TryBuildLedChoice(node, property, value, bound)) continue;
+            if (TryBuildTypedSymbolProperty(node, property, value, bound) || TryBuildLedChoice(node, property, value, bound)) continue;
             var box = Field(property, value.ToString(), text => Edit("Set " + property, n => n.Props[property] = Scalar.Parse(text, value.Kind)), async () => await EditBindingAsync(property), bound);
             if (bound) _live.Add(() => { var current = _document?.Find(_id!); if (current is not null) { var sample = _host!.Read(current, property); box.Text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString(); } });
         }

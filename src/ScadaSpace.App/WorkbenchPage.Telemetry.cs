@@ -83,6 +83,7 @@ public sealed partial class WorkbenchPage
                 previewForeground = (_styleEditor.PreviewText.Foreground as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color.ToString(),
                 previewOpacity = _styleEditor.Preview.Opacity
             },
+            inspectorTyped = TypedInspectorTelemetry(Bounds),
             inspector = _inspector.EditorFields.ToDictionary(p => p.Key, p => Bounds(p.Value)),
             inspectorChoices = _inspector.ChoiceEditors.ToDictionary(p => p.Key, p => new
             {
