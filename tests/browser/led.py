@@ -50,6 +50,10 @@ with sync_playwright() as p:
     def fill(name,text):
         click(component(name)['bounds']);page.keyboard.press('Control+a');page.keyboard.press('Backspace');page.keyboard.insert_text(str(text));page.keyboard.press('Enter')
     def choose(key,text):
+        # Selection publishes before the rebuilt native fields finish layout.
+        # Wait for the selected component's actual editable ComboBox, not its model alone.
+        selected=app()['selection']
+        page.wait_for_function('p=>JSON.stringify(window.scadaApp.selection)===JSON.stringify(p.selected) && window.scadaApp.inspector[p.key]?.width>0 && window.scadaApp.inspector[p.key]?.height>0 && window.scadaApp.inspectorChoices[p.key]?.enabled===true',arg={'key':key,'selected':selected},timeout=30000)
         click(app()['inspector'][key])
         page.wait_for_function('p=>window.scadaApp.inspectorChoices[p.key]?.options?.some(o=>o.name===p.text && o.bounds?.width>0)',arg={'key':key,'text':text},timeout=30000)
         click(next(o['bounds'] for o in app()['inspectorChoices'][key]['options'] if o['name']==text))
