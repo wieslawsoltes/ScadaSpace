@@ -36,3 +36,13 @@ invalid dimensions and duplicate publications. Every previous browser assertion
 remains, with an added tablet scaled-geometry assertion. This helper intentionally
 covers unrotated pixel-layout designer fixtures, not arbitrary transformed layouts.
 It neither invokes managed commands nor retries failed pointer inputs.
+
+## Style-suite arrangement precondition
+
+At `e5dac4e`, both symbol-editor suites passed all assertions, including the
+tablet selection and scaled-geometry check. The only browser failure was an
+earlier style-suite input sent after text color resolution but before the native
+label had measured bounds. That script now explicitly waits for both positive
+native dimensions, and its toolbar/menu commands use the shared stable-geometry
+check. Intrinsically measured styled text is not required to fill its outer
+component rectangle. All original style assertions remain unchanged.

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from native_readiness import wait_command_bounds
 
 OUT = Path('TestResults/browser-styles'); OUT.mkdir(parents=True, exist_ok=True)
 BASE = os.environ.get('SCADASPACE_URL', 'http://127.0.0.1:8765/ScadaSpace/')
@@ -39,8 +40,7 @@ with sync_playwright() as p:
         assert b and b['width']>0 and b['height']>0,'Native control is not arranged'
         page.mouse.click(b['x']+b['width']/2,b['y']+b['height']/2)
     def command(name):
-        page.wait_for_function('n=>window.scadaApp.controls[n]?.width>0',arg=name,timeout=30000)
-        click(app()['controls'][name])
+        click(wait_command_bounds(page,name))
     def field(name,text=None):
         page.wait_for_function('n=>window.scadaApp.styleEditor?.fields[n]?.width>0',arg=name,timeout=30000)
         click(editor()['fields'][name])
@@ -89,6 +89,9 @@ with sync_playwright() as p:
         check('rendered text follows alphabetical class precedence despite reversed assignment order',native('Styled')['foreground']=='#FFAA2233' and native('Styled')['fontSize']==22)
         check('inline color and font weight override classes on actual native controls',native('Inline')['foreground']=='#FF117744' and native('Inline')['fontWeight']==700)
         check('opacity applies to the decorated frame including its background',native('Inline')['opacity']==.5)
+        # Styled labels are intrinsically measured inside a decorated frame, not
+        # stretched symbol controls. Rendered colors can precede native arrangement.
+        wait('window.scadaApp.components.Styled?.bounds?.width>0 && window.scadaApp.components.Styled.bounds.height>0')
         click(app()['components']['Styled']['bounds']);wait("window.scadaApp.selection[0]==='Styled'");open_editor()
         check('Project menu opens the native style class list and grouped editor',editor()['selected']=='Alpha' and editor()['classes']==['Alpha','Zulu'])
         choose('Zulu');field('foreground','#775511');wait("window.scadaApp.styleEditor.previewForeground==='#FF775511'")
