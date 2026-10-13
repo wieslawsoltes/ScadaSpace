@@ -27,13 +27,16 @@ public sealed record LedDisplayOptions(string SegmentFormat = "14 segment", stri
     }
 }
 
-public sealed record LedDisplaySnapshot(LedDisplayOptions Options, string Text)
+public sealed record LedDisplaySnapshot(LedDisplayOptions Options, string Text, double? NumericValue = null)
 {
     public void Validate()
     {
         ArgumentNullException.ThrowIfNull(Options); Options.Validate();
+        if (NumericValue is { } number && !double.IsFinite(number)) throw new FormatException("LED value must be finite.");
         LedGlyphs.ValidateText(Text, Options.FourteenSegments);
     }
+    public LedDisplaySnapshot WithNumericValue(double value) => NumericValue is null || NumericValue == value ? this
+        : LedDisplayPresentation.Create(Scalar.From(value), Options);
 }
 
 /// <summary>Typed numeric/text presentation with no silent substitution for unrepresentable values.</summary>
@@ -52,7 +55,7 @@ public static class LedDisplayPresentation
         else throw new ArgumentException("LED value requires a number or supported segment text.");
         // Keep the original text for accessibility/export; glyph conversion is display-only.
         LedGlyphs.ValidateText(text, options.FourteenSegments);
-        return new(options, text);
+        return new(options, text, value.Kind == ScalarKind.Number ? value.Number : null);
     }
     public static LedDisplaySnapshot Read(Func<string, Scalar> read)
     {

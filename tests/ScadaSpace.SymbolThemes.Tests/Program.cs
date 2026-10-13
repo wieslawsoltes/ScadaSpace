@@ -107,6 +107,7 @@ Check("render primary and alternate theme contact sheet", () =>
     using var image = surface.Snapshot(); using var png = image.Encode(SKEncodedImageFormat.Png, 100); File.WriteAllBytes("TestResults/symbol-themes/state-themes.png", png.ToArray()); CanvasPainter.DrawingTypeface = null;
 });
 MaterialReview.Run(Check);
+LedDisplayReview.Run(Check);
 var summary = JsonSerializer.Serialize(new { tests = results.Count, failures, results }, new JsonSerializerOptions { WriteIndented = true });
 File.WriteAllText("TestResults/symbol-themes/results.json", summary);
 Console.WriteLine($"RESULT {results.Count - failures}/{results.Count} symbol theme checks passed");
