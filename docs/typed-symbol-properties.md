@@ -11,3 +11,9 @@ The unchanged vector renderer receives the edited snapshot and retains its exist
 Six engine regressions validate the metadata boundaries; the package consumer checks the independent API; the fourteenth real Uno browser suite covers native picker cancellation/validation/alpha, text validation, no-op edits, Undo/Redo, drawing and liquid colors, Boolean flags, qualified bindings, full export equality and tablet use. Existing raster and browser suites remain enabled. Executed claims belong to exact Actions revisions; SwiftShader and raster allocation fixtures are not physical-GPU performance or desktop runtime qualification.
 
 The artwork/schema and bounded hexadecimal color syntax remain ScadaSpace-specific. Full original component/CSS/Gateway parity is not implied. Chart-renderer/path-cache, configurable-popup and nested-property-tree work is unchanged.
+
+## Native text synchronization regression
+
+The first full run passed all thirteen prior browser suites and picker cancellation, alpha application, and Undo/Redo. The immediate Enter/no-op test then exposed a stale text mirror: the native TextBox already contained the new ARGB spelling, while the wrapper's cached text depended on the later TextChanged notification. The document stayed unchanged but the editor failed to restore its original equivalent spelling.
+
+Text now reads directly from the native input. Setting a value also synchronizes a differing native input even when the cached value already equals the requested one. Enter and focus-loss validation read TextBox.Text; the wrapper no longer treats a queued notification as the current input. Existing no-op and invalid-input assertions remain unchanged. Two additional native tests exercise immediate Enter and focus-loss commits of actual changed colors, including one-transaction and Undo checks. The deferred notification still drives the ordinary preview event, without adding a timer or a delayed commit.

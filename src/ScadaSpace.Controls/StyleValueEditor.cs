@@ -34,11 +34,13 @@ public sealed partial class StyleValueEditor : UserControl
     public string ColorError => _colorError?.Text ?? "";
     public string Text
     {
-        get => _text;
+        // TextChanged is dispatched later than the TextBox dependency-property update.
+        // Enter/LostFocus must read the current input, not the last delivered notification.
+        get => _input?.Text ?? _text;
         set
         {
             ArgumentNullException.ThrowIfNull(value);
-            if (value == _text) return;
+            if (value == _text && (_input is null || _input.Text == value)) return;
             if (_choice is not null && value.Length > 0 && !Options(Property.Name).Contains(value, StringComparer.Ordinal))
                 throw new ArgumentException("Unknown " + Property.Name + " option.");
             _text = value; _sync = true;
