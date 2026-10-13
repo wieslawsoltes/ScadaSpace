@@ -47,8 +47,12 @@ with sync_playwright() as p:
         assert box and box['width']>0 and box['height']>0,'Native target must be arranged'
         page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
     def command(key):click(wait_command_bounds(page,key))
+    def target(name):
+        # Undo and mode changes rebuild native controls after their new model is observable.
+        page.wait_for_function('n=>window.scadaViews?.[0]?.components[n]?.bounds?.width>0 && window.scadaViews[0].components[n].bounds.height>0',arg=name,timeout=30000)
+        return component(name)['bounds']
     def fill(name,text):
-        click(component(name)['bounds']);page.keyboard.press('Control+a');page.keyboard.press('Backspace');page.keyboard.insert_text(str(text));page.keyboard.press('Enter')
+        click(target(name));page.keyboard.press('Control+a');page.keyboard.press('Backspace');page.keyboard.insert_text(str(text));page.keyboard.press('Enter')
     def choose(key,text):
         # Selection publishes before the rebuilt native fields finish layout.
         # Wait for the selected component's actual editable ComboBox, not its model alone.
@@ -72,14 +76,14 @@ with sync_playwright() as p:
         page.wait_for_function('names=>names.every(n=>window.scadaViews?.[0]?.components[n]?.symbol?.renders>0)',arg=names,timeout=30000)
         check('all LED variants and alphanumeric readouts render through actual Uno controls',all(not symbol(n)['dataError'] and not symbol(n)['renderError'] for n in names))
         check('legacy display retains its existing colors format and seven-segment mode',symbol('Legacy')['led']['text']=='42.6' and symbol('Legacy')['led']['options']['backgroundColor']=='#22332D' and symbol('Legacy')['led']['options']['segmentFormat']=='7 segment')
-        click(component('Seven')['bounds']);wait("window.scadaApp.selection[0]==='Seven' && window.scadaApp.inspectorChoices.segmentFormat")
+        click(target('Seven'));wait("window.scadaApp.selection[0]==='Seven' && window.scadaApp.inspectorChoices.segmentFormat")
         check('Property Editor exposes segment choices and protects qualified bound format fields',app()['inspectorChoices']['segmentFormat']['enabled'] and not app()['inspectorChoices']['numberFormat']['enabled'])
         generation=app()['generation'];choose('segmentFormat','14 segment');wait('window.scadaApp.generation>'+str(generation))
         wait("window.scadaViews[0].components.Seven.symbol.led.options.segmentFormat==='14 segment'")
         check('native segment selection creates an undoable designer transaction',app()['canUndo'] and app()['generation']==generation+1)
         command('undo');wait("window.scadaViews[0].components.Seven.symbol.led.options.segmentFormat==='7 segment'")
         check('undo restores the original LED mode without dirtying the project',not app()['dirty'])
-        click(component('ColorLed')['bounds']);wait("window.scadaApp.selection[0]==='ColorLed'")
+        click(target('ColorLed'));wait("window.scadaApp.selection[0]==='ColorLed'")
         choose('numberFormat','0.0');wait("window.scadaViews[0].components.ColorLed.symbol.led.text==='12.3'")
         check('native number-format selector changes the displayed precision',symbol('ColorLed')['led']['options']['numberFormat']=='0.0')
         command('undo');wait("window.scadaViews[0].components.ColorLed.symbol.led.text==='12.34'")

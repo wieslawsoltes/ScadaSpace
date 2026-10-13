@@ -34,6 +34,7 @@ jobs:
           dotnet run --project tests/ScadaSpace.SymbolThemes.Tests -c Release
           node --test --test-reporter=tap tests/browser/navigation-adapter.test.cjs > TestResults/navigation-adapter.tap
           python tests/browser/test_runner.py
+          python tests/browser/test_globalization.py
       - name: Pack reusable engine libraries
         run: |
           for project in src/*/*.csproj; do
@@ -71,7 +72,11 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet workload install wasm-tools
       - name: Publish Uno WebAssembly application
-        run: dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
+        run: |
+          mkdir -p artifacts
+          dotnet msbuild src/ScadaSpace.App/ScadaSpace.App.csproj -p:TargetFramework=net10.0-browserwasm -getProperty:TargetFramework,TargetPlatformIdentifier,RuntimeIdentifier,WasmIncludeFullIcuData > artifacts/globalization-build-properties.json
+          dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
+          python tests/browser/check_globalization.py artifacts/browser
       - name: Pack reusable Uno controls
         run: |
           dotnet pack src/ScadaSpace.Controls -c Release -o artifacts/uno-packages
@@ -104,6 +109,8 @@ jobs:
             TestResults/browser-symbol-states
             TestResults/browser-led
             TestResults/browser-runs
+            TestResults/browser-globalization
+            artifacts/globalization-build-properties.json
             artifacts/server.log
       - uses: actions/upload-artifact@v4
         if: always()
