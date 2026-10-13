@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from native_readiness import wait_command_bounds
+from native_readiness import wait_command_bounds, wait_component_sample
 
 OUT=Path('TestResults/browser-symbol-colors');OUT.mkdir(parents=True,exist_ok=True)
 BASE=os.environ.get('SCADASPACE_URL','http://127.0.0.1:8765/ScadaSpace/')
@@ -44,8 +44,9 @@ with sync_playwright() as p:
         page.mouse.click(b['x']+b['width']/2,b['y']+b['height']/2)
     def command(key):click(wait_command_bounds(page,key))
     def select(name):
-        page.wait_for_function('n=>window.scadaViews?.[0]?.components[n]?.bounds?.width>0',arg=name,timeout=30000)
-        click(page.evaluate('n=>window.scadaViews[0].components[n].bounds',name))
+        sample=wait_component_sample(page,name)
+        logs.append({'kind':'component-input','name':name,**sample})
+        click(sample['bounds'])
         page.wait_for_function('n=>window.scadaApp.selection[0]===n && window.scadaApp.inspector.name?.width>0',arg=name,timeout=30000)
     def aux(key,control,text=None):
         page.wait_for_function('p=>window.scadaApp.inspectorTyped.colors[p.key]?.controls[p.control]?.width>0',arg={'key':key,'control':control},timeout=30000)

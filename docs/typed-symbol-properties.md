@@ -17,3 +17,22 @@ The artwork/schema and bounded hexadecimal color syntax remain ScadaSpace-specif
 The first full run passed all thirteen prior browser suites and picker cancellation, alpha application, and Undo/Redo. The immediate Enter/no-op test then exposed a stale text mirror: the native TextBox already contained the new ARGB spelling, while the wrapper's cached text depended on the later TextChanged notification. The document stayed unchanged but the editor failed to restore its original equivalent spelling.
 
 Text now reads directly from the native input. Setting a value also synchronizes a differing native input even when the cached value already equals the requested one. Enter and focus-loss validation read TextBox.Text; the wrapper no longer treats a queued notification as the current input. Existing no-op and invalid-input assertions remain unchanged. Two additional native tests exercise immediate Enter and focus-loss commits of actual changed colors, including one-transaction and Undo checks. The deferred notification still drives the ordinary preview event, without adding a timer or a delayed commit.
+
+
+## Tablet selection readiness review
+
+Run 38451212817 at head 56c5a6c passed the new material suite, core and desktop jobs,
+but the earlier symbol-choice suite timed out selecting Pump after tablet Fit. Its
+saved state has no application errors and an empty selection; the script had only
+required positive bounds, not bounds at the new zoom. That evidence identifies an
+insufficient input precondition, not a proved renderer/input-dispatch defect.
+
+Both symbol editor suites now require three distinct published ticks with matching
+view/component identity, revision, viewport and geometry. Native bounds must agree
+between both observers and match the declared pixel size times the current zoom.
+The exact observation used for each single mouse click is archived. Eight pure
+regressions cover stale scale, mismatched rectangles, identity/revision changes,
+invalid dimensions and duplicate publications. Every previous browser assertion
+remains, with an added tablet scaled-geometry assertion. This helper intentionally
+covers unrotated pixel-layout designer fixtures, not arbitrary transformed layouts.
+It neither invokes managed commands nor retries failed pointer inputs.

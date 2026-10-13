@@ -4,7 +4,7 @@ import time
 import unittest
 from pathlib import Path
 from run_all import SUITES, run_suites
-from native_readiness import CommandReadiness
+from native_readiness import CommandReadiness, ComponentReadiness
 
 class RunnerTests(unittest.TestCase):
     def test_registry_contains_each_application_suite_once(self):
@@ -79,5 +79,64 @@ class NativeReadinessTests(unittest.TestCase):
     def test_invalid_sample_budget_rejected(self):
         for count in (0,1,-1,1.5):
             with self.assertRaises(ValueError):CommandReadiness(count)
+
+class ComponentReadinessTests(unittest.TestCase):
+    @staticmethod
+    def sample(tick=1):
+        return {'tick':tick,'project':'Fixture','viewId':'view-instance','view':'Main','observedView':'Main',
+                'viewport':{'width':1024,'height':768},'zoom':.5,'generation':7,'editing':True,'preview':False,
+                'bounds':{'x':25,'y':30,'width':85,'height':115},
+                'layout':{'id':'pump','width':170,'height':230,'bounds':{'x':25,'y':30,'width':85,'height':115}}}
+    def test_stable_prefit_bounds_never_pass(self):
+        gate=ComponentReadiness()
+        for tick in range(1,8):
+            sample=self.sample(tick);sample['zoom']=.75
+            self.assertFalse(gate.accept(sample))
+    def test_both_dimensions_must_match_current_zoom(self):
+        for key in ('width','height'):
+            gate=ComponentReadiness()
+            for tick in range(1,5):
+                sample=self.sample(tick);sample['bounds'][key]+=5
+                self.assertFalse(gate.accept(sample))
+    def test_two_native_observers_must_agree(self):
+        for key in ('x','y','width','height'):
+            gate=ComponentReadiness()
+            for tick in range(1,5):
+                sample=self.sample(tick);sample['layout']['bounds'][key]+=5
+                self.assertFalse(gate.accept(sample))
+    def test_size_revision_zoom_or_instance_changes_restart_stability(self):
+        for changed in ('generation','viewId','componentId','zoom','size'):
+            gate=ComponentReadiness();gate.accept(self.sample(1));gate.accept(self.sample(2))
+            sample=self.sample(3)
+            if changed=='generation':sample['generation']+=1
+            elif changed=='viewId':sample['viewId']='replacement'
+            elif changed=='componentId':sample['layout']['id']='replacement'
+            elif changed=='size':sample['layout']['width']+=.1
+            else:sample['zoom']+=.0001
+            self.assertFalse(gate.accept(sample))
+            sample['tick']=4;self.assertFalse(gate.accept(sample))
+            sample['tick']=5;self.assertTrue(gate.accept(sample))
+    def test_invalid_sample_clears_an_almost_ready_window(self):
+        gate=ComponentReadiness();gate.accept(self.sample(1));gate.accept(self.sample(2))
+        invalid=self.sample(3);invalid['layout']=None;self.assertFalse(gate.accept(invalid))
+        self.assertFalse(gate.accept(self.sample(4)));self.assertFalse(gate.accept(self.sample(5)))
+        self.assertTrue(gate.accept(self.sample(6)))
+    def test_duplicate_publication_is_not_a_new_layout_observation(self):
+        gate=ComponentReadiness()
+        for _ in range(10):self.assertFalse(gate.accept(self.sample(1)))
+        self.assertFalse(gate.accept(self.sample(2)));self.assertTrue(gate.accept(self.sample(3)))
+    def test_wrong_view_or_preview_cannot_select_a_designer_component(self):
+        for key,value in (('observedView','Other'),('editing',False),('preview',True),('viewId',None)):
+            gate=ComponentReadiness()
+            for tick in range(1,5):
+                sample=self.sample(tick);sample[key]=value;self.assertFalse(gate.accept(sample))
+    def test_invalid_scale_or_declared_size_is_rejected(self):
+        for value in (None,True,0,-1,float('nan'),float('inf'),'0.5'):
+            for key in ('zoom','width','height'):
+                gate=ComponentReadiness()
+                for tick in range(1,5):
+                    sample=self.sample(tick)
+                    (sample if key=='zoom' else sample['layout'])[key]=value
+                    self.assertFalse(gate.accept(sample))
 
 if __name__=='__main__':unittest.main()
