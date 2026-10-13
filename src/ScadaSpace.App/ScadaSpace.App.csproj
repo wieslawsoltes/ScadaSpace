@@ -12,6 +12,10 @@
     <WasmShellWebAppBasePath>/ScadaSpace/</WasmShellWebAppBasePath>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'browserwasm'">
+    <!-- LED locale is dynamic; startup-culture ICU shards silently fall back for other locales. -->
+    <WasmIncludeFullIcuData>true</WasmIncludeFullIcuData>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ScadaSpace.Controls/ScadaSpace.Controls.csproj" />
     <ProjectReference Include="../ScadaSpace.Persistence/ScadaSpace.Persistence.csproj" />
