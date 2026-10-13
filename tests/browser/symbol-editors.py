@@ -42,6 +42,7 @@ with sync_playwright() as p:
         page.mouse.click(b['x']+b['width']/2,b['y']+b['height']/2)
     def command(key):click(wait_command_bounds(page,key))
     def select(name):
+        page.wait_for_function('n=>window.scadaViews?.[0]?.components[n]?.bounds?.width>0 && window.scadaViews[0].components[n].bounds.height>0',arg=name,timeout=30000)
         click(component(name)['bounds'])
         page.wait_for_function('n=>window.scadaApp.selection[0]===n && window.scadaApp.inspectorChoices && window.scadaApp.inspector.name?.width>0',arg=name,timeout=30000)
     def menu(key):
@@ -77,11 +78,11 @@ with sync_playwright() as p:
         check('equipment direction is independently configurable',symbol('Pump')['options']['variant']=='vacuum')
         choose('variant','centrifugal');choose('feet','left');wait("window.scadaViews[0].components.Pump.symbol.options.feet==='left'")
         check('pump feet keep an independent direction choice',symbol('Pump')['options']['orientation']=='top')
-        rows=menu('state');available=[r['name'] for r in rows];page.keyboard.press('Escape')
+        rows=menu('state');available=[r['name'] for r in rows];page.keyboard.press('Escape');wait('window.scadaApp.inspectorChoices.state.options===null')
         check('custom state choices are filtered to their applied family','service' in available and 'open' not in available)
         choose('state','service');wait("window.scadaViews[0].components.Pump.symbol.options.state==='service'")
         check('custom state selection uses its project-defined graphics materials',symbol('Pump')['options']['stateStyle']['primaryColor']=='#67A9CC')
-        select('Valve');rows=menu('state');available=[r['name'] for r in rows];page.keyboard.press('Escape')
+        select('Valve');rows=menu('state');available=[r['name'] for r in rows];page.keyboard.press('Escape');wait('window.scadaApp.inspectorChoices.state.options===null')
         check('valve choices keep all six built-in states without unrelated machine states',len(available)==6 and 'partiallyClosed' in available and 'service' not in available and 'running' not in available)
         choose('state','partiallyClosed');wait("window.scadaViews[0].components.Valve.symbol.options.state==='partiallyClosed'")
         select('Vessel');choose('orientation','horizontal');wait("window.scadaViews[0].components.Vessel.symbol.options.orientation==='horizontal'")
