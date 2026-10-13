@@ -44,6 +44,7 @@ jobs:
         run: |
           python tests/packages/verify.py
           python tests/packages/verify_symbol_states.py
+          python tests/packages/verify_led.py
       - name: Archive exact source tree
         if: always()
         run: |
@@ -101,6 +102,7 @@ jobs:
             TestResults/browser-styles
             TestResults/browser-symbols
             TestResults/browser-symbol-states
+            TestResults/browser-led
             TestResults/browser-runs
             artifacts/server.log
       - uses: actions/upload-artifact@v4

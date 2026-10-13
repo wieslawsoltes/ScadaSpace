@@ -28,7 +28,7 @@ This document describes implemented behavior, not a declaration of full parity. 
 
 ## Verification scope
 
-Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Eleven browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration, hierarchy editing, style authoring, industrial symbols and project symbol states. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
+Engine suites cover the value model, tags, expressions, bindings, history, alarms, document transactions, pages/docks, trees, numeric input and workspace/configuration APIs. The browser-history adapter and standalone NuGet consumers are tested independently. Twelve browser suites exercise the actual Uno controls: the original application, structured runtime, page navigation, hierarchical trees, local history/numeric input, designer workspace, event configuration, hierarchy editing, style authoring, industrial symbols, project symbol states and LED displays. Tests use real pointer/keyboard input; observations do not expose a managed command dispatcher.
 
 Counts and pass/fail claims apply only to the exact revision in the corresponding Actions artifacts. Build success alone is not runtime evidence. See [validation](validation.md), [configuration workflows](configuration-workflows.md), and the retained source, reports and screenshots for executed scope.
 
@@ -52,3 +52,5 @@ See [designer hierarchy editing and performance review](hierarchy-editing.md) fo
 See [industrial symbols](industrial-symbols.md) for the independent family drawings, native control integration, quality/animation behavior and explicit remaining graphics boundaries.
 
 See [project symbol states](symbol-states.md) for native state authoring, theme materials, retained flashing, package APIs and explicit compatibility limits.
+
+See [LED displays](led-displays.md) for the seven/fourteen-segment modes, native formatting choices, locale/glyph limits and retained rendering.

@@ -115,3 +115,7 @@ MIT for ScadaSpace source. Referenced packages retain their respective licenses.
 ## Project symbol states
 
 **Project → Symbol States…** configures project-owned light/dark materials, applied symbol families, and independent motion/flashing. The native editor includes typed colors, paused family previews, Add/Duplicate/Delete, per-theme Undo/Reset, and transactional Apply/OK/Cancel. **Tools → Symbol Library…** selects the session's symbol theme and reduced-motion preference. Flash-only symbols retain two vector pictures and repaint at color transitions. Existing explicit vessel liquid colors remain overrides; new vessels inherit state colors. See [state authoring, reusable APIs and validation boundaries](docs/symbol-states.md).
+
+## LED displays
+
+Seven- and fourteen-segment vector readouts support locale-aware numeric formatting, bounded alphanumeric text, independent background/active/inactive colors, and native format dropdowns in the Property Editor. Existing project defaults remain compatible. See [LED options, reusable APIs and validation boundaries](docs/led-displays.md).
