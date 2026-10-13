@@ -108,6 +108,7 @@ jobs:
             TestResults/browser-symbols
             TestResults/browser-symbol-states
             TestResults/browser-led
+            TestResults/browser-symbol-editors
             TestResults/browser-runs
             TestResults/browser-globalization
             artifacts/globalization-build-properties.json

@@ -37,7 +37,7 @@ public static class ComponentCatalog
         new("Ellipse", "Ellipse", "Drawing", 100, 100, Props(("color", S("#A7D4DF")), ("stroke", S("#5B8490")), ("strokeWidth", N(1)))),
         new("Line", "Line", "Drawing", 160, 10, Props(("color", S("#85959E")), ("strokeWidth", N(3)))),
         new("Pipe", "Pipe", "Drawing", 200, 70, Props(("color", S("#48AFC0")), ("route", S("elbow")), ("strokeWidth", N(12)), ("value", Scalar.From(true)))),
-        new("Pump", "Pump", "Symbols", 100, 100, Props(("value", Scalar.From(true)), ("color", S("#56A999")), ("appearance", S("auto")), ("state", S("default")), ("animationSpeed", S("auto")), ("orientation", S("right")))),
+        new("Pump", "Pump", "Symbols", 100, 100, Props(("value", Scalar.From(true)), ("color", S("#56A999")), ("appearance", S("auto")), ("state", S("default")), ("animationSpeed", S("auto")), ("orientation", S("right")), ("variant", S("centrifugal")), ("feet", S("bottom")))),
         new("Valve", "Valve", "Symbols", 100, 80, Props(("value", Scalar.From(true)), ("color", S("#56A999")), ("appearance", S("auto")), ("state", S("default")), ("animationSpeed", S("auto")), ("orientation", S("right")))),
         new("Motor", "Motor", "Symbols", 130, 85, Props(("value", Scalar.From(true)), ("color", S("#56A999")), ("appearance", S("auto")), ("state", S("default")), ("animationSpeed", S("auto")), ("orientation", S("right")))),
         new("Sensor", "Sensor", "Symbols", 140, 150, Props(("appearance", S("auto")), ("state", S("default")), ("orientation", S("right")), ("animationSpeed", S("auto")), ("label", S("Sensor")), ("value", Scalar.Object(new Dictionary<string, Scalar> { ["text"] = S("0") })))),
