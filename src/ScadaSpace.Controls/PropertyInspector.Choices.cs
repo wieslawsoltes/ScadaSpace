@@ -9,16 +9,19 @@ public partial class PropertyInspector
 {
     private readonly Dictionary<string, ComboBox> _choices = new(StringComparer.Ordinal);
     public IReadOnlyDictionary<string, ComboBox> ChoiceEditors => _choices;
-    private bool TryBuildLedChoice(ComponentNode node, string property, Scalar value, bool bound)
+    // Retain the existing flat-inspector entry point; it now delegates to shared symbol metadata.
+    private bool TryBuildLedChoice(ComponentNode node, string property, Scalar value, bool bound) => TryBuildPropertyChoice(node, property, value, bound);
+    private bool TryBuildPropertyChoice(ComponentNode node, string property, Scalar value, bool bound)
     {
-        if (node.Type != "LEDDisplay" || value.Kind != ScalarKind.String || property is not ("segmentFormat" or "numberFormat")) return false;
-        var presets = property == "segmentFormat" ? LedDisplayOptions.SegmentFormats : LedDisplayOptions.NumberFormats;
+        if (value.Kind != ScalarKind.String) return false;
+        var presets = SymbolEditorOptions.Choices(node.Type, property, _document?.Project.SymbolStates);
+        if (presets.Count == 0 && !(SymbolStateCatalog.IsFamily(node.Type) && property == "state")) return false;
         var row = new Grid { MinHeight = 28, Background = ControlTheme.Brush("#FAFBFC") };
         row.ColumnDefinitions.Add(new() { Width = new GridLength(88) }); row.ColumnDefinitions.Add(new()); row.ColumnDefinitions.Add(new() { Width = new GridLength(27) });
-        var label = ControlTheme.Text(property, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label);
+        var label = ControlTheme.Text(property, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label); ToolTipService.SetToolTip(label, property);
         var choice = new ComboBox
         {
-            ItemsSource = presets.Append(value.Text!).Distinct(StringComparer.Ordinal).ToArray(), SelectedItem = value.Text,
+            ItemsSource = SymbolEditorOptions.IncludeCurrent(presets, value.Text!), SelectedItem = value.Text,
             IsEnabled = !bound, FontSize = 11, MinHeight = 27, MinWidth = 0, Padding = new Thickness(4, 2, 4, 2),
             HorizontalAlignment = HorizontalAlignment.Stretch, Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF")
         };
@@ -38,7 +41,7 @@ public partial class PropertyInspector
             var current = _document?.Find(_id!); if (current is null) return;
             var sample = _host!.Read(current, property); var text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString();
             if (Equals(choice.SelectedItem, text)) return;
-            choice.ItemsSource = presets.Append(text).Distinct(StringComparer.Ordinal).ToArray(); choice.SelectedItem = text;
+            choice.ItemsSource = SymbolEditorOptions.IncludeCurrent(presets, text); choice.SelectedItem = text;
         });
         Grid.SetColumn(choice, 1); row.Children.Add(choice);
         var binding = ControlTheme.Button(bound ? "●" : "○", async () => await EditBindingAsync(property));
