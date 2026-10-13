@@ -74,7 +74,7 @@ jobs:
       - name: Publish Uno WebAssembly application
         run: |
           mkdir -p artifacts
-          dotnet msbuild src/ScadaSpace.App/ScadaSpace.App.csproj -p:TargetFramework=net10.0-browserwasm -getProperty:TargetFramework,TargetPlatformIdentifier,RuntimeIdentifier,WasmIncludeFullIcuData > artifacts/globalization-build-properties.json
+          dotnet msbuild src/ScadaSpace.App/ScadaSpace.App.csproj -p:TargetFramework=net10.0-browserwasm -getProperty:TargetFramework,TargetPlatformIdentifier,RuntimeIdentifier,BlazorWebAssemblyLoadAllGlobalizationData > artifacts/globalization-build-properties.json
           dotnet publish src/ScadaSpace.App -f net10.0-browserwasm -c Release -o artifacts/browser
           python tests/browser/check_globalization.py artifacts/browser
       - name: Pack reusable Uno controls
@@ -109,6 +109,7 @@ jobs:
             TestResults/browser-symbol-states
             TestResults/browser-led
             TestResults/browser-symbol-editors
+            TestResults/browser-symbol-colors
             TestResults/browser-runs
             TestResults/browser-globalization
             artifacts/globalization-build-properties.json

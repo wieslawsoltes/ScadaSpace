@@ -1,0 +1,13 @@
+# Typed symbol material properties
+
+The flat Property Editor provides alpha-aware color swatches for actual LED background/lit/unlit colors, vessel liquid colors, cylindrical-tank materials, and supported drawing/gauge/thermometer/pipe colors. Boolean options such as vessel stand/agitator/fill, valve reverse flow and tank scale use native checkboxes. Industrial machine state palettes remain in Project → Symbol States; an unused legacy machine `color` property is not misleadingly promoted to a material picker.
+
+Core's allocation-free `SymbolPropertyKinds` describes which renderer inputs have these editor kinds. Controls reuses `StyleValueEditor` for lazy native ColorPicker flyouts and exposes `ColorAccepted` only on explicit confirmation. The optional reset-button visibility removes inherited-style UI from ordinary component properties; existing style-class/state editor behavior is unchanged.
+
+Typing a valid color commits on Enter or leaving the field. Use color commits directly; Cancel retains the old value. Invalid input does not enter the project. Equivalent RGB/ARGB spellings create no redundant history. Color/Boolean changes use ordinary revision-guarded designer transactions with Undo/Redo. Selection, document-generation and inspector-generation guards prevent a detached old input from committing into another component. Qualified bindings remain read-only and update their displayed value without document writes. These are flat editors, not a nested property-tree implementation.
+
+The unchanged vector renderer receives the edited snapshot and retains its existing picture cache. No color picker exists until requested, no new render timer or global cache is introduced, and metadata lookup is allocation-free. Color editing does not replace state palettes or process tags. UI-only inspection and runtime preview retain complete portable project defaults.
+
+Six engine regressions validate the metadata boundaries; the package consumer checks the independent API; the fourteenth real Uno browser suite covers native picker cancellation/validation/alpha, text validation, no-op edits, Undo/Redo, drawing and liquid colors, Boolean flags, qualified bindings, full export equality and tablet use. Existing raster and browser suites remain enabled. Executed claims belong to exact Actions revisions; SwiftShader and raster allocation fixtures are not physical-GPU performance or desktop runtime qualification.
+
+The artwork/schema and bounded hexadecimal color syntax remain ScadaSpace-specific. Full original component/CSS/Gateway parity is not implied. Chart-renderer/path-cache, configurable-popup and nested-property-tree work is unchanged.
