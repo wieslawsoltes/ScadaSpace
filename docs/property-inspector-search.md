@@ -55,8 +55,8 @@ The existing color, Boolean, choice and scalar editors remain alive while typing
 or folding. They retain guarded edits, Undo/Redo and read-only evaluated bindings.
 The reusable `QualifiedEditorFields` map distinguishes duplicate names in props,
 style, custom and meta categories; the legacy unqualified map stays available.
-Search and category keyboard focus cannot route Delete or arrow keys into canvas
-editing. Long scalar-name labels now expose their full names in native tooltips.
+Search, category and native menu focus cannot route destructive shortcuts into
+canvas editing, including flyouts that occupy a separate visual root. Long scalar-name labels now expose their full names in native tooltips.
 
 ## Reuse, performance and validation
 
@@ -76,7 +76,7 @@ The existing ten filter regressions remain. Twenty-one additional engine tests
 cover all modes, explicit names, safety/error recovery, pattern reuse and wildcard
 allocation; a separate dynamic-programming oracle checks 31,713 small wildcard
 cases. Three new standalone package checks cover wildcard/regex APIs and invalid
-patterns. The sixteenth real Uno browser suite defines 30 native assertions for
+patterns. The sixteenth real Uno browser suite defines 31 native assertions for
 search options, colliding names, actual edits/Undo, bound values, category and
 keyboard behavior, retained controls, desktop/tablet use and full export equality.
 Executed results belong to the exact revision in Actions artifacts; definitions
