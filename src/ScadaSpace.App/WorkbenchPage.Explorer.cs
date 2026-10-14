@@ -66,8 +66,15 @@ public sealed partial class WorkbenchPage
     }
     private bool TextInputFocused(DependencyObject? source)
     {
-        for(var i=0;source is not null&&i<64;i++,source=VisualTreeHelper.GetParent(source))
-            if(source is TextBox or NumberBox or HmiNumericEntry or PasswordBox or ComboBox)return true;
-        return XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is TextBox or NumberBox or HmiNumericEntry or PasswordBox or ComboBox;
+        static bool InputAncestor(DependencyObject? element)
+        {
+            for (var i = 0; element is not null && i < 64; i++, element = VisualTreeHelper.GetParent(element))
+                if (element is TextBox or NumberBox or HmiNumericEntry or PasswordBox or ComboBox or PropertyInspector or MenuFlyoutItemBase) return true;
+            return false;
+        }
+        // Native flyouts are separate visual roots, so their open/focus scope is not
+        // necessarily an ancestor of the inspector button that opened them.
+        return _inspector.IsSearchOptionsOpen || InputAncestor(source)
+            || XamlRoot is not null && InputAncestor(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject);
     }
 }
