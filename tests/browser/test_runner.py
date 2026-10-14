@@ -4,11 +4,11 @@ import time
 import unittest
 from pathlib import Path
 from run_all import SUITES, run_suites
-from native_readiness import CommandReadiness, ComponentReadiness
+from native_readiness import CommandReadiness, ComponentReadiness, InspectorFieldReadiness
 
 class RunnerTests(unittest.TestCase):
     def test_registry_contains_each_application_suite_once(self):
-        self.assertEqual(len(SUITES),16)
+        self.assertEqual(len(SUITES),17)
         self.assertEqual(len(set(SUITES)),len(SUITES))
         for name in SUITES:self.assertTrue(Path(__file__).with_name(name+'.py').is_file())
     def test_invalid_concurrency_is_rejected_before_work(self):
@@ -138,5 +138,47 @@ class ComponentReadinessTests(unittest.TestCase):
                     sample=self.sample(tick)
                     (sample if key=='zoom' else sample['layout'])[key]=value
                     self.assertFalse(gate.accept(sample))
+
+class InspectorFieldReadinessTests(unittest.TestCase):
+    @staticmethod
+    def sample(tick=1):
+        return {**NativeReadinessTests.sample(tick), 'path':'props.backgroundColor', 'selection':['Led'],
+                'generation':0, 'inspection':3, 'filterRevision':5, 'query':'props.backgroundColor',
+                'syntax':'Literal', 'mode':'Anywhere', 'caseSensitive':False, 'boundOnly':False,
+                'visible':True, 'preview':False}
+    def test_field_requires_three_independent_stable_observations(self):
+        gate=InspectorFieldReadiness()
+        self.assertFalse(gate.accept(self.sample(1)));self.assertFalse(gate.accept(self.sample(2)))
+        self.assertTrue(gate.accept(self.sample(3)))
+    def test_stale_positive_bounds_of_hidden_fields_never_pass(self):
+        for key,value in (('visible',False),('visible',None),('preview',True)):
+            gate=InspectorFieldReadiness()
+            for tick in range(1,5):
+                sample=self.sample(tick);sample[key]=value;self.assertFalse(gate.accept(sample))
+    def test_document_inspection_query_or_path_changes_restart_stability(self):
+        for key,value in (('generation',1),('inspection',4),('filterRevision',6),('query','color'),
+                          ('selection',['Other']),('path','custom.backgroundColor'),('syntax','Wildcard'),
+                          ('mode','Exact'),('caseSensitive',True),('boundOnly',True)):
+            gate=InspectorFieldReadiness();gate.accept(self.sample(1));gate.accept(self.sample(2))
+            sample=self.sample(3);sample[key]=value;self.assertFalse(gate.accept(sample))
+            sample['tick']=4;self.assertFalse(gate.accept(sample))
+            sample['tick']=5;self.assertTrue(gate.accept(sample))
+    def test_invalid_identity_clears_the_observation_window(self):
+        for key,value in (('selection',[]),('selection',['A','B']),('selection','Led'),('path',None),
+                          ('query',None),('inspection',True),('generation',-1),('filterRevision',None),
+                          ('viewId',''),('caseSensitive',None),('boundOnly',0)):
+            gate=InspectorFieldReadiness();gate.accept(self.sample(1));gate.accept(self.sample(2))
+            sample=self.sample(3);sample[key]=value;self.assertFalse(gate.accept(sample))
+            self.assertFalse(gate.accept(self.sample(4)));self.assertFalse(gate.accept(self.sample(5)))
+            self.assertTrue(gate.accept(self.sample(6)))
+    def test_native_layout_movement_and_duplicate_ticks_do_not_prove_readiness(self):
+        gate=InspectorFieldReadiness();gate.accept(self.sample(1));gate.accept(self.sample(2))
+        sample=self.sample(3);sample['bounds']['y']+=30;self.assertFalse(gate.accept(sample))
+        for _ in range(5):self.assertFalse(gate.accept(sample))
+        sample['tick']=4;self.assertFalse(gate.accept(sample));sample['tick']=5;self.assertTrue(gate.accept(sample))
+    def test_selection_snapshots_do_not_alias_the_input_list(self):
+        gate=InspectorFieldReadiness();sample=self.sample(1);gate.accept(sample)
+        sample['selection'][0]='Other';sample['tick']=2;self.assertFalse(gate.accept(sample))
+        sample['tick']=3;self.assertFalse(gate.accept(sample));sample['tick']=4;self.assertTrue(gate.accept(sample))
 
 if __name__=='__main__':unittest.main()

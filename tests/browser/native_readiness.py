@@ -71,6 +71,29 @@ class ComponentReadiness(CommandReadiness):
         return super().identity(sample) + (layout['id'], sample.get('generation'), zoom, layout['width'], layout['height'])
 
 
+
+class InspectorFieldReadiness(CommandReadiness):
+    """Require a current visible qualified field and a stable inspector projection."""
+    def identity(self, sample: dict[str, Any]) -> tuple | None:
+        if sample.get('visible') is not True or sample.get('preview') is not False:
+            return None
+        selection = sample.get('selection')
+        if not isinstance(selection, list) or len(selection) != 1 or not isinstance(selection[0], str) or not selection[0]:
+            return None
+        keys = ('path', 'viewId', 'syntax', 'mode')
+        if any(not isinstance(sample.get(key), str) or not sample[key] for key in keys):
+            return None
+        if not isinstance(sample.get('query'), str):
+            return None
+        revisions = tuple(sample.get(key) for key in ('generation', 'inspection', 'filterRevision'))
+        if any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in revisions):
+            return None
+        flags = tuple(sample.get(key) for key in ('caseSensitive', 'boundOnly'))
+        if any(not isinstance(value, bool) for value in flags):
+            return None
+        return super().identity(sample) + (sample['path'], tuple(selection), sample['query'], sample['syntax'], sample['mode']) + revisions + flags
+
+
 def wait_component_sample(page: Any, name: str, timeout: int = 30000) -> dict[str, Any]:
     """Wait for current scaled native geometry; the caller sends exactly one pointer input."""
     deadline = time.monotonic() + timeout / 1000
@@ -116,3 +139,30 @@ def wait_command_bounds(page: Any, key: str, timeout: int = 30000) -> dict[str, 
                                arg=sample.get('tick', -1) if isinstance(sample.get('tick'), int) else -1,
                                timeout=remaining)
     raise TimeoutError(f'Native command geometry did not settle: {key}; last observation: {sample}')
+
+
+def wait_inspector_field_sample(page: Any, path: str, timeout: int = 30000) -> dict[str, Any]:
+    """Observe settled field layout without expanding categories or retrying input."""
+    deadline = time.monotonic() + timeout / 1000
+    tracker = InspectorFieldReadiness()
+    sample = None
+    while time.monotonic() < deadline:
+        sample = page.evaluate("""path => {
+            const app = window.scadaApp, filter = app?.inspectorFilter;
+            return {
+                tick: app?.tick, project: app?.project, viewId: window.scadaViews?.[0]?.id,
+                viewport: app?.viewport, bounds: app?.inspectorQualified?.[path],
+                path, selection: app?.selection, generation: app?.generation, preview: app?.preview,
+                inspection: filter?.builds, filterRevision: filter?.applies,
+                query: filter?.query, syntax: filter?.syntax, mode: filter?.mode,
+                caseSensitive: filter?.caseSensitive, boundOnly: filter?.boundOnly,
+                visible: filter?.visible?.includes(path) === true
+            };
+        }""", path)
+        if tracker.accept(sample):
+            return sample
+        remaining = max(1, int((deadline - time.monotonic()) * 1000))
+        page.wait_for_function('tick => Number.isInteger(window.scadaApp?.tick) && window.scadaApp.tick > tick',
+                               arg=sample.get('tick', -1) if isinstance(sample.get('tick'), int) else -1,
+                               timeout=remaining)
+    raise TimeoutError(f'Native inspector field did not settle: {path}; last observation: {sample}')

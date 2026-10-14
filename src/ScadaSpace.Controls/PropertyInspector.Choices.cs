@@ -16,14 +16,12 @@ public partial class PropertyInspector
         if (value.Kind != ScalarKind.String) return false;
         var presets = SymbolEditorOptions.Choices(node.Type, property, _document?.Project.SymbolStates);
         if (presets.Count == 0 && !(SymbolStateCatalog.IsFamily(node.Type) && property == "state")) return false;
-        var row = new Grid { MinHeight = 28, Background = ControlTheme.Brush("#FAFBFC") };
-        row.ColumnDefinitions.Add(new() { Width = new GridLength(88) }); row.ColumnDefinitions.Add(new()); row.ColumnDefinitions.Add(new() { Width = new GridLength(27) });
-        var label = ControlTheme.Text(property, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label); ToolTipService.SetToolTip(label, property);
+        var row = BuildPropertyRow(property, async () => await EditBindingAsync(property), bound);
         var choice = new ComboBox
         {
             ItemsSource = SymbolEditorOptions.IncludeCurrent(presets, value.Text!), SelectedItem = value.Text,
             IsEnabled = !bound, FontSize = 11, MinHeight = 27, MinWidth = 0, Padding = new Thickness(4, 2, 4, 2),
-            HorizontalAlignment = HorizontalAlignment.Stretch, Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF")
+            Foreground = ValueBrush(value.Kind), HorizontalAlignment = HorizontalAlignment.Stretch, Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF")
         };
         AutomationProperties.SetName(choice, property); AutomationProperties.SetAutomationId(choice, "inspector-" + property);
         _choices[property] = choice; RegisterPropertyEditor(property, choice);
@@ -36,16 +34,13 @@ public partial class PropertyInspector
             catch (Exception error) when (error is ArgumentException or InvalidOperationException or FormatException)
             { _message.Text = error.Message; Error?.Invoke(error.Message); }
         };
-        if (bound) _live.Add(() =>
+        if (bound) TrackBoundText(property, (text, kind) =>
         {
-            var current = _document?.Find(_id!); if (current is null) return;
-            var sample = _host!.Read(current, property); var text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString();
+            choice.Foreground = ValueBrush(kind);
             if (Equals(choice.SelectedItem, text)) return;
             choice.ItemsSource = SymbolEditorOptions.IncludeCurrent(presets, text); choice.SelectedItem = text;
         });
-        Grid.SetColumn(choice, 1); row.Children.Add(choice);
-        var binding = ControlTheme.Button(bound ? "●" : "○", async () => await EditBindingAsync(property));
-        binding.Foreground = ControlTheme.Brush(bound ? "#138EB6" : "#8396A2"); binding.Padding = new Thickness(2); binding.BorderThickness = new Thickness(0);
-        Grid.SetColumn(binding, 2); row.Children.Add(binding); AddFilterRow(row, property, bound); return true;
+        Grid.SetColumn(choice, 2); row.Children.Add(choice);
+        AddFilterRow(row, property, bound); return true;
     }
 }

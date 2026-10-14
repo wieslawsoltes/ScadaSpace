@@ -83,6 +83,7 @@ public sealed partial class WorkbenchPage
                 previewForeground = (_styleEditor.PreviewText.Foreground as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color.ToString(),
                 previewOpacity = _styleEditor.Preview.Opacity
             },
+            inspectorAuthoring = InspectorAuthoringTelemetry(Bounds),
             inspectorFilter = new
             {
                 query = _inspector.FilterQuery, boundOnly = _inspector.FilterBoundOnly,

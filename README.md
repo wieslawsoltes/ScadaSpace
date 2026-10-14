@@ -123,3 +123,7 @@ Seven- and fourteen-segment vector readouts support locale-aware numeric formatt
 ## Typed symbol material inputs
 
 The flat Property Editor includes native color swatches with an alpha-aware Use/Cancel picker and checkboxes for supported vessel, valve and tank flags. Qualified bound inputs remain read-only; edits participate in normal Undo/Redo. See [typed symbol properties](docs/typed-symbol-properties.md).
+
+### Typed property authoring
+
+The flat Property Editor now supports native creation of all six portable value kinds, including JSON Objects/Arrays and explicit Null. Numeric editing uses round-trip precision; malformed structured text is handled as a local validation error. Type-colored values and aligned left-side binding controls improve the inspector layout, while unchanged bound values reuse their displayed text. See [property authoring](docs/property-authoring.md) for ownership guards, tests and limits.
