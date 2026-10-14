@@ -21,12 +21,7 @@ public partial class PropertyInspector
         var flag = value.Kind == ScalarKind.Boolean && SymbolPropertyKinds.IsSwitch(node.Type, property);
         if (!color && !flag) return false;
 
-        var row = new Grid { MinHeight = 28, Background = ControlTheme.Brush("#FAFBFC") };
-        row.ColumnDefinitions.Add(new() { Width = new GridLength(88) });
-        row.ColumnDefinitions.Add(new());
-        row.ColumnDefinitions.Add(new() { Width = new GridLength(27) });
-        var label = ControlTheme.Text(property, 11); label.Margin = new Thickness(7, 0, 2, 0);
-        ToolTipService.SetToolTip(label, property); row.Children.Add(label);
+        var row = BuildPropertyRow(property, async () => await EditBindingAsync(property), bound);
         var owner = _document; var componentId = _id; var generation = owner?.Generation; var inspection = _inspectionVersion;
         bool Current() => !bound && owner is not null && _inspectionVersion == inspection
             && ReferenceEquals(_document, owner) && _id == componentId && owner.Generation == generation;
@@ -37,7 +32,7 @@ public partial class PropertyInspector
             var editor = new StyleValueEditor(new("background", "Symbol", ScalarKind.String, "#RRGGBB or #AARRGGBB"), showResetButton: false)
             { Text = value.Text!, IsEnabled = !bound };
             var textBox = (TextBox)editor.InputElement;
-            textBox.FontSize = 11; textBox.MinHeight = 27; textBox.IsReadOnly = bound;
+            textBox.Foreground = ValueBrush(value.Kind); textBox.FontSize = 11; textBox.MinHeight = 27; textBox.IsReadOnly = bound;
             AutomationProperties.SetName(textBox, property);
             ToolTipService.SetToolTip(editor.AuxiliaryControls["color"], "Choose " + property);
             _colorEditors[property] = editor; RegisterPropertyEditor(property, textBox);
@@ -59,12 +54,7 @@ public partial class PropertyInspector
             textBox.LostFocus += (_, _) => Apply();
             textBox.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Apply(); e.Handled = true; } };
             editor.ColorAccepted += Apply;
-            if (bound) _live.Add(() =>
-            {
-                var current = _document?.Find(_id!); if (current is null) return;
-                var sample = _host!.Read(current, property);
-                editor.Text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString();
-            });
+            if (bound) TrackBoundText(property, (text, kind) => { editor.Text = text; textBox.Foreground = ValueBrush(kind); });
             input = editor;
         }
         else
@@ -89,9 +79,7 @@ public partial class PropertyInspector
             input = toggle;
         }
         AutomationProperties.SetAutomationId(input, "inspector-" + property);
-        Grid.SetColumn(input, 1); row.Children.Add(input);
-        var binding = ControlTheme.Button(bound ? "●" : "○", async () => await EditBindingAsync(property));
-        binding.Foreground = ControlTheme.Brush(bound ? "#138EB6" : "#8396A2"); binding.Padding = new Thickness(2); binding.BorderThickness = new Thickness(0);
-        Grid.SetColumn(binding, 2); row.Children.Add(binding); AddFilterRow(row, property, bound); return true;
+        Grid.SetColumn(input, 2); row.Children.Add(input);
+        AddFilterRow(row, property, bound); return true;
     }
 }

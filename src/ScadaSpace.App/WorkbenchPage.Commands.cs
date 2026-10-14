@@ -143,7 +143,7 @@ public sealed partial class WorkbenchPage
     private void HandleKeys(object sender, KeyRoutedEventArgs e)
     {
         var ctrl = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0;
-        if (e.Handled || _dialog) return;
+        if (e.Handled || _dialog || _inspector.CreationEditor is not null) return;
         var shift = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0;
         if (!_sessionMode && ctrl && e.Key == VirtualKey.Tab) { ChangeResources(() => _resources.Cycle(shift ? -1 : 1)); e.Handled = true; return; }
         if (!_sessionMode && ctrl && e.Key == VirtualKey.W && _resources.ActiveView is {} active) { ChangeResources(() => _resources.Close(active)); e.Handled = true; return; }

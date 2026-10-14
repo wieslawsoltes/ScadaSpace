@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using ScadaSpace.Core;
 using ScadaSpace.Designer;
+using ScadaSpace.Runtime;
 using static Suite;
 
 internal static class PropertyAuthoringTests

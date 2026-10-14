@@ -33,6 +33,7 @@ public partial class PropertyInspector : Grid
     public void Inspect(DesignerDocument document, string? id, ViewHost host)
     {
         _inspectionVersion++; ResetFilterRows();
+        _creationOpenCommands.Clear(); _bindingCommands.Clear(); _propertyLabels.Clear();
         _document = document; _host = host; _id = id; _fields.Children.Clear(); _editorFields.Clear(); _choices.Clear(); _colorEditors.Clear(); _switchEditors.Clear(); _live.Clear(); _message.Text = ""; EventConfigurationButton = null;
         var node = id is null ? null : document.Find(id);
         if (node is null) { _heading.Text = "No component selected"; _fields.Children.Add(new TextBlock { Text = "Select a component on the canvas or in the project browser.\n\nDrag the lower-right handle to resize. Use Ctrl-click for multiple selection.", FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10), Foreground = ControlTheme.Brush("#758792") }); FinishFilterRows(false); return; }
@@ -46,16 +47,16 @@ public partial class PropertyInspector : Grid
         {
             var property = pair.Key; var value = pair.Value; var bound = node.Bindings.ContainsKey(property) || node.Bindings.ContainsKey("props." + property);
             if (TryBuildTypedSymbolProperty(node, property, value, bound) || TryBuildLedChoice(node, property, value, bound)) continue;
-            var box = Field(property, value.ToString(), text => Edit("Set " + property, n => n.Props[property] = Scalar.Parse(text, value.Kind)), async () => await EditBindingAsync(property), bound);
-            if (bound) _live.Add(() => { var current = _document?.Find(_id!); if (current is not null) { var sample = _host!.Read(current, property); box.Text = sample.IsGood ? sample.Value.ToString() : sample.Quality.ToString(); } });
+            var box = Field(property, PropertyValueText.Format(value), text => Edit("Set " + property, n => n.Props[property] = PropertyValueText.Parse(text, value.Kind)), async () => await EditBindingAsync(property), bound, value.Kind);
+            if (bound) TrackBoundText(property, (text, kind) => { box.Text = text; box.Foreground = ValueBrush(kind); });
         }
-        var add = ControlTheme.Button("+ Add custom property", async () => await AddPropertyAsync(false)); add.Margin = new Thickness(5); AddFilterRow(add, "Add property", property: false);
+        BuildAddPropertyCommand(false);
         Section("POSITION");
-        Field("x", node.X.ToString(CultureInfo.InvariantCulture), text => Edit("Set X", n => n.X = Parse(text)));
-        Field("y", node.Y.ToString(CultureInfo.InvariantCulture), text => Edit("Set Y", n => n.Y = Parse(text)));
-        Field("width", node.Width.ToString(CultureInfo.InvariantCulture), text => Edit("Set width", n => n.Width = Parse(text)));
-        Field("height", node.Height.ToString(CultureInfo.InvariantCulture), text => Edit("Set height", n => n.Height = Parse(text)));
-        Field("rotation", node.Rotation.ToString(CultureInfo.InvariantCulture), text => Edit("Rotate component", n => n.Rotation = Parse(text)));
+        Field("x", node.X.ToString(CultureInfo.InvariantCulture), text => Edit("Set X", n => n.X = Parse(text)), kind: ScalarKind.Number);
+        Field("y", node.Y.ToString(CultureInfo.InvariantCulture), text => Edit("Set Y", n => n.Y = Parse(text)), kind: ScalarKind.Number);
+        Field("width", node.Width.ToString(CultureInfo.InvariantCulture), text => Edit("Set width", n => n.Width = Parse(text)), kind: ScalarKind.Number);
+        Field("height", node.Height.ToString(CultureInfo.InvariantCulture), text => Edit("Set height", n => n.Height = Parse(text)), kind: ScalarKind.Number);
+        Field("rotation", node.Rotation.ToString(CultureInfo.InvariantCulture), text => Edit("Rotate component", n => n.Rotation = Parse(text)), kind: ScalarKind.Number);
         if (node.Type == "Container")
         {
             var layout = new ComboBox { ItemsSource = Enum.GetValues<LayoutKind>(), SelectedItem = node.Layout, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(6), MinHeight = 30 };
@@ -63,11 +64,11 @@ public partial class PropertyInspector : Grid
         }
         Section("STYLE");
         Field("classes", string.Join(", ", node.StyleClasses), text => Edit("Set style classes", n => n.StyleClasses = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToList()));
-        foreach (var pair in node.Style.OrderBy(p => p.Key)) { var key = pair.Key; var value = pair.Value; Field(key, value.ToString(), text => Edit("Set style", n => n.Style[key] = Scalar.Parse(text, value.Kind))); }
+        foreach (var pair in node.Style.OrderBy(p => p.Key)) { var key = pair.Key; var value = pair.Value; Field(key, PropertyValueText.Format(value), text => Edit("Set style", n => n.Style[key] = PropertyValueText.Parse(text, value.Kind)), kind: value.Kind); }
         AddFilterRow(ControlTheme.Button("Edit style JSON…", async () => await EditJsonAsync("Style", JsonSerializer.Serialize(node.Style, ProjectCodec.Options), text => Edit("Edit style", n => n.Style = JsonSerializer.Deserialize<Dictionary<string, Scalar>>(text, ProjectCodec.Options) ?? throw new FormatException("Style cannot be null.")))), "Edit style JSON", property: false);
         Section("CUSTOM");
-        foreach (var pair in node.Custom.OrderBy(p => p.Key)) { var key = pair.Key; var value = pair.Value; Field(key, value.ToString(), text => Edit("Set custom property", n => n.Custom[key] = Scalar.Parse(text, value.Kind))); }
-        AddFilterRow(ControlTheme.Button("+ Add to custom", async () => await AddPropertyAsync(true)), "Add property", property: false);
+        foreach (var pair in node.Custom.OrderBy(p => p.Key)) { var key = pair.Key; var value = pair.Value; Field(key, PropertyValueText.Format(value), text => Edit("Set custom property", n => n.Custom[key] = PropertyValueText.Parse(text, value.Kind)), kind: value.Kind); }
+        BuildAddPropertyCommand(true);
         Section("EVENTS");
         foreach (var pair in node.Events) AddFilterRow(ControlTheme.Text("  " + pair.Key + "  ·  " + pair.Value.Count + " actions", 11), pair.Key, property: false);
         BuildEventCommand(node);
@@ -80,12 +81,10 @@ public partial class PropertyInspector : Grid
         if (!double.IsFinite(value)) throw new FormatException("A finite value is required.");
         return value;
     }
-    private TextBox Field(string name, string text, Action<string> commit, Action? binding = null, bool bound = false)
+    private TextBox Field(string name, string text, Action<string> commit, Action? binding = null, bool bound = false, ScalarKind kind = ScalarKind.String)
     {
-        var row = new Grid { MinHeight = 28, Background = ControlTheme.Brush("#FAFBFC") };
-        row.ColumnDefinitions.Add(new() { Width = new GridLength(88) }); row.ColumnDefinitions.Add(new()); row.ColumnDefinitions.Add(new() { Width = new GridLength(binding is null ? 0 : 27) });
-        var label = ControlTheme.Text(name, 11); label.Margin = new Thickness(7, 0, 2, 0); row.Children.Add(label); ToolTipService.SetToolTip(label, name);
-        var box = new TextBox { Text = text, FontSize = 11, MinHeight = 27, MinWidth = 0, Padding = new Thickness(4, 2, 4, 2), BorderThickness = new Thickness(0, 0, 0, 1), BorderBrush = ControlTheme.Brush("#E4E8EB"), Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF"), IsReadOnly = bound };
+        var row = BuildPropertyRow(name, binding, bound);
+        var box = new TextBox { Text = text, FontSize = 11, MinHeight = 27, MinWidth = 0, Padding = new Thickness(4, 2, 4, 2), BorderThickness = new Thickness(0, 0, 0, 1), BorderBrush = ControlTheme.Brush("#E4E8EB"), Background = ControlTheme.Brush(bound ? "#EDF8FC" : "#FFFFFF"), IsReadOnly = bound, Foreground = ValueBrush(kind) };
         RegisterPropertyEditor(name, box);
         var original = text;
         var owner = _document; var componentId = _id; var generation = owner?.Generation; var inspection = _inspectionVersion;
@@ -93,36 +92,16 @@ public partial class PropertyInspector : Grid
         {
             if (bound || box.Text == original || _inspectionVersion != inspection || !ReferenceEquals(_document, owner) || _id != componentId || owner?.Generation != generation) return;
             try { commit(box.Text); original = box.Text; _message.Text = ""; }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException) { _message.Text = ex.Message; box.Text = original; Error?.Invoke(ex.Message); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException or JsonException or OverflowException) { _message.Text = ex.Message; box.Text = original; Error?.Invoke(ex.Message); }
         }
         box.LostFocus += (_, _) => Apply(); box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Apply(); e.Handled = true; } };
-        Grid.SetColumn(box, 1); row.Children.Add(box);
-        if (binding is not null) { var button = ControlTheme.Button(bound ? "●" : "○", binding); button.Foreground = ControlTheme.Brush(bound ? "#138EB6" : "#8396A2"); button.Padding = new Thickness(2); button.BorderThickness = new Thickness(0); Grid.SetColumn(button, 2); row.Children.Add(button); }
+        Grid.SetColumn(box, 2); row.Children.Add(box);
         AddFilterRow(row, name, bound); return box;
     }
     private void Edit(string label, Action<ComponentNode> action)
     {
         if (_document is null || _id is null) return;
         _document.Execute(label, _ => action(_document.Find(_id) ?? throw new InvalidOperationException("Component no longer exists.")));
-    }
-    private async Task AddPropertyAsync(bool custom)
-    {
-        var name = new TextBox { Header = "Property name", Text = "customValue", MinWidth = 300 };
-        var kind = new ComboBox { Header = "Value type", ItemsSource = new[] { ScalarKind.String, ScalarKind.Number, ScalarKind.Boolean }, SelectedIndex = 0 };
-        var value = new TextBox { Header = "Initial value", Text = "" };
-        var error = new TextBlock { Foreground = ControlTheme.Brush("#B14E37"), TextWrapping = TextWrapping.Wrap };
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Add property", PrimaryButtonText = "Add", CloseButtonText = "Cancel", Content = new StackPanel { Spacing = 10, Children = { name, kind, value, error } } };
-        dialog.PrimaryButtonClick += (_, args) =>
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(name.Text) || name.Text.Length > 128 || name.Text.Any(char.IsControl)) throw new FormatException("Use a non-empty property name of at most 128 characters.");
-                var parsed = Scalar.Parse(value.Text, (ScalarKind)kind.SelectedItem);
-                Edit("Add property", n => { var target = custom ? n.Custom : n.Props; if (!target.TryAdd(name.Text, parsed)) throw new InvalidOperationException("That property already exists."); });
-            }
-            catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException) { args.Cancel = true; error.Text = ex.Message; }
-        };
-        await dialog.ShowAsync();
     }
     public async Task EditBindingAsync(string property)
     {
