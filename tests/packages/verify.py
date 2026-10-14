@@ -91,6 +91,10 @@ propertyFilter.Set("^diode(On|Off)Color$", false, PropertySearchSyntax.RegularEx
 Check(propertyFilter.Error.Length == 0 && propertyFilter.Matches("props.diodeOffColor", "diodeOffColor"), "packaged bounded regular expressions execute without an app reference");
 propertyFilter.Set("[", false, PropertySearchSyntax.RegularExpression, PropertySearchMatch.Anywhere, false);
 Check(propertyFilter.Error.Length > 0 && !propertyFilter.Matches("props.color"), "packaged invalid regex queries fail closed");
+var propertyDraft = new PropertyCreationDraft(document, component.Id, PropertyCreationGroup.Custom);
+Check(propertyDraft.Apply(document, "packageData", ScalarKind.Object, """{"precision":1.23456789012345,"values":[true,null]}"""), "packaged creation applies an owned typed property");
+Check(document.Find(component.Id)!.Custom["packageData"].Fields["precision"].Number == 1.23456789012345, "packaged property authoring retains structured numeric precision");
+Check(PropertyValueText.Parse(PropertyValueText.Format(Scalar.From(0.000000123456789)), ScalarKind.Number).Number == 0.000000123456789, "packaged editor text round-trips tiny numbers without process rounding");
 
 
 '''
@@ -111,8 +115,8 @@ try:
             if run.returncode:
                 raise RuntimeError(f"Standalone package consumer failed ({run.returncode})")
         count = sum(line.startswith("PASS ") for line in logs[-1].splitlines())
-        if count != 23:
-            raise RuntimeError(f"Expected twenty-three executed package checks; got {count}")
+        if count != 26:
+            raise RuntimeError(f"Expected twenty-six executed package checks; got {count}")
         assets = json.loads((root / "obj/project.assets.json").read_text())
         libraries = assets["libraries"]
         if any(item["type"] == "project" for item in libraries.values()):

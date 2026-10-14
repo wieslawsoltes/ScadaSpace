@@ -112,6 +112,7 @@ jobs:
             TestResults/browser-symbol-colors
             TestResults/browser-inspector-search
             TestResults/browser-inspector-search-modes
+            TestResults/browser-property-authoring
             TestResults/browser-runs
             TestResults/browser-globalization
             artifacts/globalization-build-properties.json
