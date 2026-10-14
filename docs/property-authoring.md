@@ -67,3 +67,24 @@ property authoring, not the excluded nested-property-tree implementation. Full
 Perspective/Gateway, arbitrary-precision data, pixel-identical appearance and
 native desktop runtime qualification are not implied. The excluded chart-renderer
 and configurable-popup proposals remain unchanged.
+
+
+## Native input readiness review
+
+At head `2dbf919`, all 29 new authoring assertions passed, along with 15 other
+browser suites. The older flat-search suite alone timed out after a filtered
+color-field click. Its saved state showed the PROPS category collapsed, the
+original material unchanged and no application errors. The helper waited only
+for positive field bounds, which can precede native layout after filtering.
+That is evidence of an insufficient input precondition, not proof of a renderer
+or document-transaction defect.
+
+The affected suite now requires three distinct published observations of the
+visible qualified field, unchanged selection/document/inspector/filter identity,
+and stable usable native bounds before sending its single click. The exact
+observation is archived for scalar/color edits and the filtered Boolean input.
+Six dependency-free regressions cover stale hidden bounds, identity changes,
+layout movement, repeated ticks and immutable selection snapshots. All 22 original
+native assertions are retained; the helper never expands categories, mutates
+application state or retries failed pointer input. Production source is unchanged
+by this test-readiness correction. Final passing claims require a fresh full run.

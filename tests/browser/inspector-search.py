@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from native_readiness import wait_command_bounds, wait_component_sample
+from native_readiness import wait_command_bounds, wait_component_sample, wait_inspector_field_sample
 
 OUT=Path('TestResults/browser-inspector-search');OUT.mkdir(parents=True,exist_ok=True)
 BASE=os.environ.get('SCADASPACE_URL','http://127.0.0.1:8765/ScadaSpace/')
@@ -44,9 +44,10 @@ with sync_playwright() as p:
     def select(name):
         sample=wait_component_sample(page,name);logs.append({'kind':'component-input','name':name,**sample});click(sample['bounds'])
         page.wait_for_function('n=>window.scadaApp.selection[0]===n && window.scadaApp.inspectorFilter.total>0',arg=name,timeout=30000)
-    def edit(key,text):
-        page.wait_for_function('k=>window.scadaApp.inspector[k]?.width>0',arg=key,timeout=30000)
-        click(app()['inspector'][key]);page.keyboard.press('Control+a');page.keyboard.insert_text(text);page.keyboard.press('Enter')
+    def field_sample(path):
+        sample=wait_inspector_field_sample(page,path);logs.append({'kind':'inspector-input',**sample});return sample
+    def edit(path,text):
+        click(field_sample(path)['bounds']);page.keyboard.press('Control+a');page.keyboard.insert_text(text);page.keyboard.press('Enter')
     def check(name,ok):
         results.append({'name':name,'passed':bool(ok)})
         if not ok:raise AssertionError(name)
@@ -69,12 +70,12 @@ with sync_playwright() as p:
         check('unmatched searches expose an explicit empty state and hide all fields',state()['visible']==[] and all(value is None for value in app()['inspector'].values()))
         page.keyboard.press('Escape');wait("window.scadaApp.inspectorFilter.query==='' && !window.scadaApp.inspectorFilter.boundOnly")
         check('Escape restores the retained property controls without editing the document',len(state()['visible'])==state()['total'] and state()['rowsCreated']==before['rowsCreated'] and app()['generation']==generation)
-        search('props.backgroundColor');edit('backgroundColor','#304050')
+        search('props.backgroundColor');edit('props.backgroundColor','#304050')
         wait("window.scadaViews[0].components.Led.symbol.led.options.backgroundColor==='#304050'")
         check('filtered native color fields still commit ordinary undoable edits',app()['generation']==generation+1 and state()['query']=='props.backgroundColor' and state()['visible']==['props.backgroundColor'])
         command('undo');wait("window.scadaViews[0].components.Led.symbol.led.options.backgroundColor==='#161616'")
         check('undo restores edited colors while preserving the local search',not app()['dirty'] and state()['query']=='props.backgroundColor')
-        search('custom.note');generation=app()['generation'];edit('note','reviewed')
+        search('custom.note');generation=app()['generation'];edit('custom.note','reviewed')
         wait('window.scadaApp.generation>'+str(generation))
         current=export('custom-edited.json');saved=next(n for n in current['views'][0]['root']['children'] if n['name']=='Led')
         check('filtered custom properties use the existing validated transaction',saved['custom']['note']['text']=='reviewed' and state()['visible']==['custom.note'])
@@ -88,8 +89,7 @@ with sync_playwright() as p:
         filter_command('clear');wait("window.scadaApp.inspectorFilter.query==='' && !window.scadaApp.inspectorFilter.boundOnly")
         check('the clear command resets both filters',len(state()['visible'])==state()['total'])
         select('Vessel');search('display');check('native Boolean rows participate in the same flat property search',len(state()['visible'])==3 and all(path.startswith('props.display') for path in state()['visible']))
-        page.wait_for_function('window.scadaApp.inspectorTyped.switches.displayFillLevel.bounds?.width>0',timeout=30000)
-        b=app()['inspectorTyped']['switches']['displayFillLevel']['bounds'];page.mouse.click(b['x']+12,b['y']+b['height']/2)
+        b=field_sample('props.displayFillLevel')['bounds'];page.mouse.click(b['x']+12,b['y']+b['height']/2)
         wait('window.scadaViews[0].components.Vessel.symbol.options.displayFillLevel===false')
         check('filtered Boolean editors retain ordinary renderer updates and search state',state()['query']=='display' and app()['canUndo'])
         command('undo');wait('window.scadaViews[0].components.Vessel.symbol.options.displayFillLevel===true && !window.scadaApp.dirty')
